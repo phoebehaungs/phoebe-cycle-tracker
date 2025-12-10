@@ -12,7 +12,7 @@ interface PhaseDefinition {
   color: string;
   hormone: string; 
   lightColor: string;
-  accent: string; // 用於 UI 強調色
+  accent: string;
 }
 
 interface CycleRecord {
@@ -49,7 +49,7 @@ const INITIAL_HISTORY: CycleRecord[] = [
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords'; 
 
-// 新配色方案 (柔和、現代感強)
+// 最終優化配色方案 (柔和、現代感強)
 const PHASE_RULES: PhaseDefinition[] = [
   {
     name: '生理期',
@@ -58,10 +58,10 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['疲倦', '想休息', '子宮悶感'],
     diet: ['食慾低～中', '想吃冰', '多補充蛋白質'],
     care: ['不逼自己運動', '多喝紅棗黑豆枸杞茶', '早餐多蛋白質'],
-    color: '#FF6F91', // 紅色/桃粉
+    color: '#E95A85', // 柔和紅/桃粉
     lightColor: '#FFE7EE', 
     hormone: '雌激素與黃體素低點',
-    accent: '#E95A85',
+    accent: '#D63A7F',
   },
   {
     name: '濾泡期 (黃金期)',
@@ -70,8 +70,8 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['精力恢復', '心情穩定', '身體輕盈'],
     diet: ['食慾最低', '最好控制', '飽足感良好'],
     care: ['適合減脂', '建立新習慣', 'Zumba / 伸展'],
-    color: '#00B894', // 翡翠綠
-    lightColor: '#E6FFF8',
+    color: '#6AB04C', // 溫和綠色
+    lightColor: '#E9F5E3',
     hormone: '雌激素逐漸上升',
     accent: '#4CB582',
   },
@@ -82,8 +82,8 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['微水腫', '下腹不適', '體溫升高'],
     diet: ['食慾微增', '有些人想吃甜'],
     care: ['多喝水', '多吃蔬菜', '補充可溶性纖維(地瓜)'],
-    color: '#FDCB6E', // 柔和黃/橘
-    lightColor: '#FFF8E6',
+    color: '#FFB84D', // 柔和橘黃
+    lightColor: '#FFF3E0',
     hormone: '黃體生成素(LH)高峰',
     accent: '#F49B00',
   },
@@ -94,8 +94,8 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['情緒敏感', '容易累'],
     diet: ['開始嘴饞', '想吃頻率變高'],
     care: ['提前保護血糖', '下午準備安全點心', '每餐加纖維'],
-    color: '#A29BFE', // 柔和藍紫
-    lightColor: '#EAE8FF',
+    color: '#8396D1', // 柔和藍
+    lightColor: '#E6E9F5',
     hormone: '黃體素開始上升',
     accent: '#896CD9',
   },
@@ -106,8 +106,8 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['焦慮', '睡不好', '水腫', '罪惡感', '子宮收縮'],
     diet: ['想吃甜/冰', '正餐後還想吃', '食慾高峰'],
     care: ['補充鎂', '低負擔運動(伸展)', '允許自己多吃 5-10%', '深呼吸'],
-    color: '#D63A7F', // 深桃粉
-    lightColor: '#FFE7EE',
+    color: '#C76A9A', // 偏紅紫
+    lightColor: '#F4E5ED',
     hormone: '黃體素高峰 / 準備下降',
     accent: '#D1589F',
   },
@@ -226,7 +226,6 @@ const PhoebeCycleTracker: React.FC = () => {
       const completedCycles = history.filter((h) => h.length !== null);
       if (completedCycles.length === 0) return 34;
       const totalDays = completedCycles.reduce((sum, h) => sum + (h.length || 0), 0);
-      // **重要**：這裡的平均週期只用來計算預測，但下次預測的長度將會由用戶在彈窗中輸入的 `editCycleLength` 決定。
       return Math.round(totalDays / completedCycles.length);
     }, [history]);
 
@@ -449,10 +448,9 @@ const PhoebeCycleTracker: React.FC = () => {
       // 2. 修改當前週期的開始日期
       updatedHistory[updatedHistory.length - 1].startDate = editDate;
       
-      // 3. 為了讓未來預測能立即反應，我們在新增下一筆紀錄時，才更新長度。
-      //    但此處的 editCycleLength 已經在 setEditCycleLength 狀態中被儲存了，
-      //    我們可以選擇將其作為一個 meta 屬性儲存，但為了簡潔，我們依賴下一次的記錄來更新平均值。
-      
+      // 雖然 editCycleLength 沒直接寫入當前週期的 length (因為它還沒結束)，
+      // 但我們在這裡將其作為一個新值，在下次記錄時會影響平均值。
+
       setHistory(updatedHistory);
       setCurrentMonth(new Date(editDate));
       setEditMode(false);
@@ -475,11 +473,10 @@ const PhoebeCycleTracker: React.FC = () => {
       });
     };
     
-    // 初始化編輯狀態的 useEffect，確保每次開啟彈窗都使用最新數據
+    // 初始化編輯狀態的 useEffect
     useEffect(() => {
         if (editMode) {
             setEditDate(lastStartDate);
-            // 設置週期長度的預設值為當前平均長度
             setEditCycleLength(averageCycleLength); 
         }
     }, [editMode, lastStartDate, averageCycleLength]);
@@ -506,7 +503,7 @@ const PhoebeCycleTracker: React.FC = () => {
             backgroundColor: currentPhase.lightColor, 
             padding: '30px 20px', 
             textAlign: 'center', 
-            border: `1px solid ${currentPhase.lightColor}`, // 移除頂部大邊框，採用圓潤邊界
+            border: `1px solid ${currentPhase.lightColor}`, 
             marginBottom: '20px',
         }}>
           
@@ -580,7 +577,7 @@ const PhoebeCycleTracker: React.FC = () => {
                   style={{ 
                     ...calendarDayStyle, 
                     backgroundColor: isToday ? currentPhase.lightColor : (phase ? `${phase.lightColor}80` : 'transparent'),
-                    opacity: isCurrentMonth ? 1 : 0.8, // 非本月日期較為柔和
+                    opacity: isCurrentMonth ? 1 : 0.8, 
                     border: isPeriodStart ? `2px solid ${phase?.accent || '#E95A85'}` : '1px solid #f0f0f0', 
                     cursor: phase ? 'pointer' : 'default',
                   }}
@@ -648,7 +645,7 @@ const PhoebeCycleTracker: React.FC = () => {
           {/* 症狀區 */}
           <div style={cardStyle}>
             <h3 style={cardTitleStyle}>🌡️ 當前症狀總結</h3>
-            <ul style={listStyle}>
+            <ul style={listListStyle}>
               {currentPhase.symptoms.map((s, i) => <li key={i}>{s}</li>)}
             </ul>
           </div>
@@ -836,7 +833,7 @@ const cardTitleStyle: React.CSSProperties = {
   paddingBottom: '5px'
 };
 
-const listStyle: React.CSSProperties = {
+const listListStyle: React.CSSProperties = {
   margin: 0,
   paddingLeft: '20px',
   fontSize: '1rem',
@@ -914,7 +911,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const recordButtonStyle: React.CSSProperties = {
-    backgroundColor: PHASE_RULES[1].color, // 濾泡期綠色
+    backgroundColor: PHASE_RULES[1].color, 
     color: 'white',
     border: 'none',
     padding: '10px 20px',
@@ -1051,14 +1048,5 @@ const symptomRecordBoxStyle: React.CSSProperties = {
     paddingTop: '10px',
     borderTop: '1px solid #f0f0f0',
 };
-
-const listListStyle: React.CSSProperties = {
-  margin: 0,
-  paddingLeft: '20px',
-  fontSize: '1rem',
-  color: '#555',
-  lineHeight: '1.7'
-};
-
 
 export default PhoebeCycleTracker;
