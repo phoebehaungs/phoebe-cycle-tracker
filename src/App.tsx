@@ -71,7 +71,6 @@ const PHASE_RULES: PhaseDefinition[] = [
 // --- 3. 輔助函數 (Helpers - 必須在組件外部定義) ---
 
 const getFormattedDate = (date: Date): string => {
-  // 注意：toISOString() 會將時間轉為 UTC，但在這裡為了計算日期差，我們只取日期部分
   const y = date.getFullYear();
   const m = date.getMonth() + 1;
   const d = date.getDate();
@@ -81,7 +80,10 @@ const getFormattedDate = (date: Date): string => {
 const getDaysDifference = (date1: string, date2: string): number => {
   const d1 = new Date(date1);
   const d2 = new Date(date2);
-  const diffTime = d2.getTime() - d1.getTime(); // 計算時間差
+  // 重置時間以避免時區影響計算天數
+  d1.setHours(0, 0, 0, 0);
+  d2.setHours(0, 0, 0, 0);
+  const diffTime = d2.getTime() - d1.getTime(); 
   return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 };
 
@@ -147,7 +149,8 @@ const PhoebeCycleTracker: React.FC = () => {
     const dateStr = getFormattedDate(date);
     const diffDays = getDaysDifference(lastStartDate, dateStr) + 1;
 
-    if (date < new Date(lastStartDate)) return undefined; // 排除當前週期開始前的日期
+    // 排除當前週期開始前的日期
+    if (date < new Date(lastStartDate)) return undefined; 
 
     return PHASE_RULES.find(
       (p) => diffDays >= p.startDay && diffDays <= p.endDay
@@ -175,11 +178,12 @@ const PhoebeCycleTracker: React.FC = () => {
 
     // 填補月末的空白
     const totalDays = days.length;
-    const remainingSlots = (Math.ceil(totalDays / 7) * 7) - totalDays;
+    const slotsToFill = (Math.ceil(totalDays / 7) * 7) - totalDays;
     
-    for (let i = 1; i <= remainingSlots; i++) {
+    for (let i = 1; i <= slotsToFill; i++) {
       const nextMonthDay = new Date(endDay);
-      nextMonthDay.setDate(endMonth.getDate() + i);
+      // *** 修正點 ***：使用 endDay.getDate() 而非錯誤的 endMonth
+      nextMonthDay.setDate(endDay.getDate() + i); 
       days.push(nextMonthDay);
     }
     
@@ -193,8 +197,6 @@ const PhoebeCycleTracker: React.FC = () => {
     if (!window.confirm(`確定要在 ${inputDate} 開始新的生理期嗎？`)) return;
 
     const newStartDate = inputDate;
-
-    // 修正差異值計算：上個週期長度 = 新開始日 - 舊開始日
     const prevCycleLength = getDaysDifference(lastStartDate, newStartDate); 
     
     // 檢查週期長度是否合理
@@ -202,7 +204,6 @@ const PhoebeCycleTracker: React.FC = () => {
         alert("錯誤：新的開始日期不能早於或等於上一次開始日期！");
         return;
     }
-
 
     const updatedHistory = [...history];
     updatedHistory[updatedHistory.length - 1].length = prevCycleLength;
