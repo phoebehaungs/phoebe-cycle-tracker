@@ -10,8 +10,8 @@ interface PhaseDefinition {
   care: string[];
   diet: string[];
   color: string;
-  hormone: string; // 新增賀爾蒙週期
-  lightColor: string; // 新增淺色背景
+  hormone: string; 
+  lightColor: string;
 }
 
 interface CycleRecord {
@@ -20,11 +20,22 @@ interface CycleRecord {
   length: number | null;
 }
 
+// 新增症狀紀錄的類型定義
+interface SymptomRecord {
+  date: string; // "YYYY-MM-DD"
+  appetite: '低' | '中' | '高' | '';
+  mood: '穩定' | '敏感/焦慮' | '低落' | '';
+  body: '無水腫' | '微水腫' | '水腫明顯' | ''; // 身體狀況，專注於水腫
+  sleep: '良好' | '普通' | '睡不好' | '';
+  notes: string;
+}
+
 // 彈窗顯示的日期資訊
 interface DateDetail {
     date: string;
     day: number;
     phase: PhaseDefinition;
+    record: SymptomRecord | undefined; // 該日期的個人紀錄
 }
 
 // --- 2. Phoebe 的專屬設定資料 (Constants) ---
@@ -35,8 +46,9 @@ const INITIAL_HISTORY: CycleRecord[] = [
     { id: '2', startDate: '2025-12-09', length: null }, // 當前週期 (假設當前日期為 2025-12-10)
 ];
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
+const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords'; // 新增症狀紀錄的儲存鍵
 
-// 核心階段規則 (已根據您的上次週期長度 34 天調整 PMS 結束日)
+// 核心階段規則
 const PHASE_RULES: PhaseDefinition[] = [
   {
     name: '生理期',
@@ -45,8 +57,8 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['疲倦', '想休息', '子宮悶感'],
     diet: ['食慾低～中', '想吃冰', '多補充蛋白質'],
     care: ['不逼自己運動', '多喝紅棗黑豆枸杞茶', '早餐多蛋白質'],
-    color: '#E95A85', // 柔和桃粉 (主色)
-    lightColor: '#FDD9E4', // 淺色背景
+    color: '#E95A85', 
+    lightColor: '#FDD9E4', 
     hormone: '雌激素與黃體素低點',
   },
   {
@@ -56,7 +68,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['精力恢復', '心情穩定', '身體輕盈'],
     diet: ['食慾最低', '最好控制', '飽足感良好'],
     care: ['適合減脂', '建立新習慣', 'Zumba / 伸展'],
-    color: '#4CB582', // 清新綠色
+    color: '#4CB582', 
     lightColor: '#D3EEDA',
     hormone: '雌激素逐漸上升',
   },
@@ -67,7 +79,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['微水腫', '下腹不適', '體溫升高'],
     diet: ['食慾微增', '有些人想吃甜'],
     care: ['多喝水', '多吃蔬菜', '補充可溶性纖維(地瓜)'],
-    color: '#F49B00', // 溫暖橘色
+    color: '#F49B00', 
     lightColor: '#FEECCB',
     hormone: '黃體生成素(LH)高峰',
   },
@@ -78,77 +90,30 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['情緒敏感', '容易累'],
     diet: ['開始嘴饞', '想吃頻率變高'],
     care: ['提前保護血糖', '下午準備安全點心', '每餐加纖維'],
-    color: '#896CD9', // 柔和紫色
+    color: '#896CD9', 
     lightColor: '#E2DAF1',
     hormone: '黃體素開始上升',
   },
   {
     name: 'PMS 高峰',
     startDay: 30,
-    endDay: 33, // 根據您上次週期長度 34 天，將這裡的預設結束日調整
+    endDay: 33, 
     symptoms: ['焦慮', '睡不好', '水腫', '罪惡感', '子宮收縮'],
     diet: ['想吃甜/冰', '正餐後還想吃', '食慾高峰'],
     care: ['補充鎂', '低負擔運動(伸展)', '允許自己多吃 5-10%', '深呼吸'],
-    color: '#D1589F', // 偏紅紫
+    color: '#D1589F', 
     lightColor: '#F2D9E7',
     hormone: '黃體素高峰 / 準備下降',
   },
 ];
 
-// 上次週期（ID: 1, Start: 2025-11-05）的客製化歷史數據 (保持不動，作為歷史摘要)
-const LAST_CYCLE_DETAILS = [
-    {
-        name: '生理期',
-        days: 'Day 1–6',
-        dates: '11/5–11/10',
-        color: PHASE_RULES[0].color,
-        content: [
-            '疲倦、想休息、想吃冰',
-            '食慾低～中',
-        ]
-    },
-    {
-        name: '濾泡期 (黃金期)',
-        days: 'Day 7–24',
-        dates: '11/11–11/28',
-        color: PHASE_RULES[1].color,
-        content: [
-            '精力恢復、心情穩定',
-            '食慾最低、最好控制',
-        ]
-    },
-    {
-        name: '排卵期',
-        days: 'Day 25–27',
-        dates: '11/29–12/1',
-        color: PHASE_RULES[2].color,
-        content: [
-            '微水腫、下腹不適',
-            '食慾微增',
-        ]
-    },
-    {
-        name: '黃體期前段',
-        days: 'Day 28–29',
-        dates: '12/2–12/3',
-        color: PHASE_RULES[3].color,
-        content: [
-            '情緒敏感、容易累',
-            '開始嘴饞',
-        ]
-    },
-    {
-        name: 'PMS 高峰',
-        days: 'Day 30–34', // 總長 34 天 (Day 30 - Day 34)
-        dates: '12/4–12/9',
-        color: PHASE_RULES[4].color,
-        content: [
-            '想吃甜、想吃冰、正餐後還想吃 (食慾)',
-            '焦慮、睡不好、水腫、罪惡感 (症狀)',
-            '子宮收縮（Day 33 / 12/7）',
-        ]
-    },
-];
+// 新增的症狀選項
+const SYMPTOM_OPTIONS = {
+    appetite: ['低', '中', '高'],
+    mood: ['穩定', '敏感/焦慮', '低落'],
+    body: ['無水腫', '微水腫', '水腫明顯'],
+    sleep: ['良好', '普通', '睡不好'],
+};
 
 
 // --- 3. 輔助函數 (Helpers) ---
@@ -183,11 +148,21 @@ const endOfMonth = (date: Date): Date => {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0);
 };
 
+// 建立一個空的症狀紀錄物件
+const createEmptyRecord = (date: string): SymptomRecord => ({
+    date: date,
+    appetite: '',
+    mood: '',
+    body: '',
+    sleep: '',
+    notes: '',
+});
+
 
 // --- 4. 主組件 (Main Component) ---
 
 const PhoebeCycleTracker: React.FC = () => {
-    // 使用 localStorage 讀取數據
+    // 週期歷史紀錄
     const [history, setHistory] = useState<CycleRecord[]>(() => {
         const storedHistory = localStorage.getItem(LOCAL_STORAGE_KEY);
         try {
@@ -198,15 +173,32 @@ const PhoebeCycleTracker: React.FC = () => {
         }
     });
 
+    // 症狀紀錄
+    const [symptomRecords, setSymptomRecords] = useState<SymptomRecord[]>(() => {
+        const storedRecords = localStorage.getItem(SYMPTOM_STORAGE_KEY);
+        try {
+            return storedRecords ? JSON.parse(storedRecords) : [];
+        } catch (e) {
+            console.error("Failed to parse symptom records from localStorage:", e);
+            return [];
+        }
+    });
+
     // 將數據寫入 localStorage
     useEffect(() => {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(history));
     }, [history]);
 
+    useEffect(() => {
+        localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords));
+    }, [symptomRecords]);
+
+
     const [inputDate, setInputDate] = useState<string>(getFormattedDate(new Date()));
     const [currentMonth, setCurrentMonth] = useState(new Date());
     
     const [modalDetail, setModalDetail] = useState<DateDetail | null>(null); 
+    const [currentRecord, setCurrentRecord] = useState<SymptomRecord | null>(null); // 用於Modal中的編輯狀態
     
     const [editMode, setEditMode] = useState(false);
     const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
@@ -234,7 +226,6 @@ const PhoebeCycleTracker: React.FC = () => {
       const phase = PHASE_RULES.find(
         (p) => daysPassed >= p.startDay && daysPassed <= p.endDay
       );
-      // 如果超過了最長的結束日，則停留在最後一期 (用於持續預測)
       const lastPhase = PHASE_RULES[PHASE_RULES.length - 1];
       if (daysPassed > lastPhase.endDay) return lastPhase; 
 
@@ -249,19 +240,21 @@ const PhoebeCycleTracker: React.FC = () => {
         return Math.min(100, (daysPassed / averageCycleLength) * 100);
     }, [daysPassed, averageCycleLength]);
 
-    // --- 月曆相關邏輯 (已修正) ---
+    // 取得指定日期的症狀紀錄
+    const getSymptomRecordForDate = useCallback((dateStr: string): SymptomRecord | undefined => {
+        return symptomRecords.find(r => r.date === dateStr);
+    }, [symptomRecords]);
 
-    // 檢查日期屬於哪個週期，並返回對應的階段
+    // --- 月曆相關邏輯 ---
+
     const getPhaseForDate = useCallback((date: Date): PhaseDefinition | undefined => {
         const dateStr = getFormattedDate(date);
         
         // 1. 檢查所有已完成的歷史週期 (由近到遠)
-        // 排除最後一個 (currentCycle)
         for (let i = history.length - 2; i >= 0; i--) {
             const h = history[i];
             if (h.length !== null) {
                 const cycleStartDate = h.startDate;
-                // 週期結束日 = 開始日 + 長度 - 1
                 const cycleEndDate = addDays(cycleStartDate, h.length - 1); 
 
                 if (dateStr >= cycleStartDate && dateStr <= cycleEndDate) {
@@ -284,14 +277,12 @@ const PhoebeCycleTracker: React.FC = () => {
                 (p) => currentDay >= p.startDay && currentDay <= p.endDay
             );
             
-            // 如果日期在未來，超出已定義的階段天數，則返回最後一期階段作為預測
             const lastPhase = PHASE_RULES[PHASE_RULES.length - 1];
             if (currentDay > lastPhase.endDay) return lastPhase; 
 
             return phase;
         }
 
-        // 3. 日期早於最早的紀錄
         return undefined;
     }, [history]);
 
@@ -352,37 +343,85 @@ const PhoebeCycleTracker: React.FC = () => {
     };
 
     const handleDateClick = (date: Date) => {
+        const dateStr = getFormattedDate(date);
         const phase = getPhaseForDate(date);
-        if (phase) {
-            // 計算點擊日期相對應的週期日
-            let cycleDay = 0;
-            const dateStr = getFormattedDate(date);
-            const currentCycleStartDate = history[history.length - 1].startDate;
+        
+        if (!phase) return; // 不在任何週期內，不彈窗
 
-            if (dateStr >= currentCycleStartDate) {
-                cycleDay = getDaysDifference(currentCycleStartDate, dateStr) + 1;
-            } else {
-                for (let i = history.length - 2; i >= 0; i--) {
-                    const h = history[i];
-                    if (h.length !== null) {
-                        const cycleStartDate = h.startDate;
-                        const cycleEndDate = addDays(cycleStartDate, h.length - 1);
-                        if (dateStr >= cycleStartDate && dateStr <= cycleEndDate) {
-                            cycleDay = getDaysDifference(cycleStartDate, dateStr) + 1;
-                            break;
-                        }
+        // 1. 計算週期日
+        let cycleDay = 0;
+        const currentCycleStartDate = history[history.length - 1].startDate;
+        
+        // 判斷屬於當前週期還是歷史週期
+        let cycleStartDate = currentCycleStartDate;
+        if (dateStr < currentCycleStartDate) {
+            for (let i = history.length - 2; i >= 0; i--) {
+                const h = history[i];
+                if (h.length !== null) {
+                    const hStart = h.startDate;
+                    const hEnd = addDays(hStart, h.length - 1);
+                    if (dateStr >= hStart && dateStr <= hEnd) {
+                        cycleStartDate = hStart;
+                        break;
                     }
                 }
             }
-            
-            if(cycleDay === 0) return; // Should not happen if phase exists
-            
-            setModalDetail({
-                date: getFormattedDate(date),
-                day: cycleDay,
-                phase: phase
-            });
         }
+        cycleDay = getDaysDifference(cycleStartDate, dateStr) + 1;
+        if (cycleDay <= 0) return;
+
+
+        // 2. 取得症狀紀錄，若無則建立空的紀錄
+        const existingRecord = getSymptomRecordForDate(dateStr);
+        const record = existingRecord || createEmptyRecord(dateStr);
+        
+        // 3. 設定 Modal 狀態
+        setCurrentRecord(record);
+        setModalDetail({
+            date: dateStr,
+            day: cycleDay,
+            phase: phase,
+            record: record
+        });
+    };
+    
+    // 儲存症狀紀錄
+    const handleSaveSymptomRecord = () => {
+        if (!currentRecord) return;
+
+        const dateToSave = currentRecord.date;
+        const recordIndex = symptomRecords.findIndex(r => r.date === dateToSave);
+        
+        const isBlank = Object.values(currentRecord).slice(1, 5).every(v => v === '') && currentRecord.notes.trim() === '';
+        
+        if (isBlank) {
+            // 如果是空白紀錄，且原本存在，則刪除
+            if (recordIndex !== -1) {
+                const updatedRecords = symptomRecords.filter((_, index) => index !== recordIndex);
+                setSymptomRecords(updatedRecords);
+            }
+        } else {
+            // 如果有內容，則儲存或更新
+            if (recordIndex !== -1) {
+                const updatedRecords = [...symptomRecords];
+                updatedRecords[recordIndex] = currentRecord;
+                setSymptomRecords(updatedRecords);
+            } else {
+                setSymptomRecords([...symptomRecords, currentRecord]);
+            }
+        }
+        
+        setModalDetail(null);
+        setCurrentRecord(null);
+        alert(`已儲存 ${dateToSave} 的個人紀錄。`);
+    };
+
+    const handleRecordChange = (field: keyof SymptomRecord, value: string) => {
+        setCurrentRecord((prev) => {
+            if (!prev) return prev;
+            // @ts-ignore
+            return { ...prev, [field]: value };
+        });
     };
 
     const handleSaveEdit = () => {
@@ -503,9 +542,11 @@ const PhoebeCycleTracker: React.FC = () => {
             {generateCalendarDays.map((date, i) => {
               const phase = getPhaseForDate(date);
               const dateStr = getFormattedDate(date);
+              const record = getSymptomRecordForDate(dateStr);
+              
               const isToday = dateStr === todayStr;
               const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-              const isPeriodStart = dateStr === lastStartDate;
+              const isPeriodStart = dateStr === lastStartDate || history.slice(0, history.length - 1).some(h => h.startDate === dateStr);
 
               return (
                 <div 
@@ -513,7 +554,6 @@ const PhoebeCycleTracker: React.FC = () => {
                   onClick={() => handleDateClick(date)}
                   style={{ 
                     ...calendarDayStyle, 
-                    // 如果有階段顏色，則使用該階段的淺色背景；如果是今天，使用當前階段的淺色背景
                     backgroundColor: isToday ? currentPhase.lightColor : (phase ? `${phase.lightColor}80` : 'transparent'),
                     opacity: isCurrentMonth ? 1 : 0.4, 
                     border: isPeriodStart ? '2px solid #E95A85' : '1px solid #eee', 
@@ -529,9 +569,14 @@ const PhoebeCycleTracker: React.FC = () => {
                         height: '5px', 
                         borderRadius: '2px', 
                         width: '80%',
-                        margin: '0 auto' 
+                        margin: '0 auto',
+                        marginBottom: record ? '3px' : '0' 
                       }}
                     ></div>
+                  )}
+                  {/* 顯示紀錄標記 */}
+                  {record && (
+                    <div style={recordDotStyle} title="有個人紀錄"></div>
                   )}
                 </div>
               );
@@ -572,32 +617,7 @@ const PhoebeCycleTracker: React.FC = () => {
             </div>
         </div>
         
-        {/* 4. 上次週期詳細紀錄 (保留，提供症狀摘要) */}
-        <div style={{...cardStyle, marginTop: '30px'}}>
-            <h3 style={cardTitleStyle}>📖 上一次週期紀錄 (2025-11-05 ~ 2025-12-08)</h3>
-            <div style={{ padding: '0 10px' }}>
-                {LAST_CYCLE_DETAILS.map((detail, index) => (
-                    <div key={index} style={historyItemStyle}>
-                        <div style={{ 
-                            fontWeight: 'bold', 
-                            color: detail.color, 
-                            borderBottom: '2px dotted #eee',
-                            paddingBottom: '5px'
-                        }}>
-                           {detail.name} &nbsp; ({detail.days} / {detail.dates})
-                        </div>
-                        <ul style={historyListStyle}>
-                            {detail.content.map((c, i) => (
-                                <li key={i} style={{color: '#555'}}>{c}</li>
-                            ))}
-                        </ul>
-                    </div>
-                ))}
-            </div>
-        </div>
-
-
-        {/* 5. 當前週期建議卡片 */}
+        {/* 4. 當前週期建議卡片 */}
         <div style={{ display: 'grid', gap: '15px', marginTop: '30px' }}>
           
           {/* 症狀區 */}
@@ -623,21 +643,71 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
 
 
-      {/* 彈窗模組：日期詳情 */}
-      {modalDetail && (
+      {/* 彈窗模組：日期詳情與紀錄 */}
+      {modalDetail && currentRecord && (
           <div style={modalOverlayStyle}>
-              <div style={modalContentStyle}>
-                  <h3 style={{ color: modalDetail.phase.color }}>{modalDetail.date} 詳情</h3>
+              <div style={{ ...modalContentStyle, width: '400px' }}>
+                  <h3 style={{ color: modalDetail.phase.color }}>{modalDetail.date} 詳情與紀錄</h3>
                   <p style={modalTextStyle}>週期日: <strong>Day {modalDetail.day}</strong></p>
                   <p style={modalTextStyle}>階段: <strong style={{color: modalDetail.phase.color}}>{modalDetail.phase.name}</strong></p>
-                  <p style={modalTextStyle}>賀爾蒙週期: <strong>{modalDetail.phase.hormone}</strong></p>
                   
                   <h4 style={modalSubtitleStyle}>預期症狀/食慾:</h4>
                   <ul style={modalListStyle}>
                       {[...modalDetail.phase.symptoms, ...modalDetail.phase.diet].map((s, i) => <li key={i}>{s}</li>)}
                   </ul>
 
-                  <button onClick={() => setModalDetail(null)} style={modalCloseButtonStyle}>關閉</button>
+                  {/* 症狀紀錄區 */}
+                  <div style={symptomRecordBoxStyle}>
+                      <h4 style={{...modalSubtitleStyle, color: '#896CD9', borderBottom: '1px solid #ddd'}}>📝 每日個人紀錄</h4>
+                      
+                      {/* 食慾 */}
+                      <RecordDropdown 
+                        label="食慾" 
+                        options={SYMPTOM_OPTIONS.appetite} 
+                        value={currentRecord.appetite}
+                        onChange={(v) => handleRecordChange('appetite', v as any)} 
+                      />
+                      
+                      {/* 心情 */}
+                      <RecordDropdown 
+                        label="心情" 
+                        options={SYMPTOM_OPTIONS.mood} 
+                        value={currentRecord.mood}
+                        onChange={(v) => handleRecordChange('mood', v as any)} 
+                      />
+
+                      {/* 身體狀況 (水腫) */}
+                      <RecordDropdown 
+                        label="身體 (水腫)" 
+                        options={SYMPTOM_OPTIONS.body} 
+                        value={currentRecord.body}
+                        onChange={(v) => handleRecordChange('body', v as any)} 
+                      />
+                      
+                      {/* 睡眠 */}
+                      <RecordDropdown 
+                        label="睡眠" 
+                        options={SYMPTOM_OPTIONS.sleep} 
+                        value={currentRecord.sleep}
+                        onChange={(v) => handleRecordChange('sleep', v as any)} 
+                      />
+
+                      {/* 備註 */}
+                      <div style={{ marginTop: '10px' }}>
+                          <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '5px', color: '#555' }}>備註：</label>
+                          <textarea
+                              value={currentRecord.notes}
+                              onChange={(e) => handleRecordChange('notes', e.target.value)}
+                              rows={3}
+                              style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '5px', boxSizing: 'border-box' }}
+                          />
+                      </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                      <button onClick={() => setModalDetail(null)} style={{ ...modalCloseButtonStyle, backgroundColor: '#ccc', flex: 1, marginTop: '20px' }}>取消</button>
+                      <button onClick={handleSaveSymptomRecord} style={{ ...modalCloseButtonStyle, backgroundColor: '#896CD9', flex: 1, marginTop: '20px' }}>儲存紀錄</button>
+                  </div>
               </div>
           </div>
       )}
@@ -668,6 +738,39 @@ const PhoebeCycleTracker: React.FC = () => {
       </div>
     );
 };
+
+// --- 子組件：下拉選單 ---
+
+interface RecordDropdownProps {
+    label: string;
+    options: string[];
+    value: string;
+    onChange: (value: string) => void;
+}
+
+const RecordDropdown: React.FC<RecordDropdownProps> = ({ label, options, value, onChange }) => {
+    return (
+        <div style={{ marginBottom: '10px' }}>
+            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '5px', color: '#555' }}>{label}:</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+                {options.map((option) => (
+                    <button
+                        key={option}
+                        onClick={() => onChange(value === option ? '' : option)} // 點擊已選中的選項會取消選擇
+                        style={{
+                            ...symptomButtonStyle,
+                            backgroundColor: value === option ? '#896CD9' : '#eee',
+                            color: value === option ? 'white' : '#555',
+                        }}
+                    >
+                        {option}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 
 // --- Styles (CSS-in-JS for simplicity) ---
 
@@ -702,21 +805,6 @@ const listStyle: React.CSSProperties = {
   color: '#555',
   lineHeight: '1.7'
 };
-
-const historyItemStyle: React.CSSProperties = {
-    marginBottom: '15px',
-    padding: '10px',
-    backgroundColor: '#f9f9f9',
-    borderRadius: '8px'
-}
-
-const historyListStyle: React.CSSProperties = {
-    margin: '8px 0 0 0',
-    paddingLeft: '20px',
-    fontSize: '0.95rem',
-    color: '#666',
-    lineHeight: '1.5'
-}
 
 const calendarNavButtonStyle: React.CSSProperties = {
   backgroundColor: '#f0f0f0',
@@ -813,6 +901,17 @@ const predictionDateStyle: React.CSSProperties = {
     lineHeight: '1.2',
 };
 
+const recordDotStyle: React.CSSProperties = {
+    width: '6px',
+    height: '6px',
+    backgroundColor: '#896CD9', // 紫色標記有紀錄
+    borderRadius: '50%',
+    position: 'absolute',
+    bottom: '5px',
+    right: '5px',
+};
+
+
 // --- 圓餅圖樣式 (Circular Progress Chart) ---
 const circularChartContainerStyle: React.CSSProperties = {
     display: 'flex',
@@ -895,6 +994,24 @@ const modalListStyle: React.CSSProperties = {
 const modalTextStyle: React.CSSProperties = {
     fontSize: '1rem',
     marginBottom: '8px'
+};
+
+const symptomRecordBoxStyle: React.CSSProperties = {
+    marginTop: '20px',
+    paddingTop: '10px',
+    borderTop: '1px solid #f0f0f0',
+};
+
+const symptomButtonStyle: React.CSSProperties = {
+    border: '1px solid #ddd',
+    borderRadius: '15px',
+    padding: '5px 10px',
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+    flexGrow: 1,
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
 };
 
 export default PhoebeCycleTracker;
