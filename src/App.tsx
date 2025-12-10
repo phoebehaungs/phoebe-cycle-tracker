@@ -1,18 +1,17 @@
-import type { FC, CSSProperties } from 'react';
-
-const pageStyle: CSSProperties = {
+const pageStyle = {
   minHeight: '100vh',
   margin: 0,
   padding: 0,
   display: 'flex',
-  flexDirection: 'column',
+  flexDirection: 'column' as const,
   justifyContent: 'center',
   alignItems: 'center',
   backgroundColor: '#faf9f6',
-  fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily:
+    'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
 };
 
-const titleStyle: CSSProperties = {
+const titleStyle = {
   fontSize: '2rem',
   fontWeight: 800,
   color: '#12324a',
@@ -20,27 +19,27 @@ const titleStyle: CSSProperties = {
   marginBottom: '12px',
 };
 
-const subtitleStyle: CSSProperties = {
+const subtitleStyle = {
   fontSize: '0.95rem',
   color: '#555',
-  textAlign: 'center',
+  textAlign: 'center' as const,
   maxWidth: '320px',
   lineHeight: 1.6,
 };
 
-const highlightStyle: CSSProperties = {
+const highlightStyle = {
   color: '#0070f3',
   textDecoration: 'underline',
 };
 
-const App: FC = () => {
+const App = () => {
   return (
     <div style={pageStyle}>
       <h1 style={titleStyle}>PMS 大作戰</h1>
       <p style={subtitleStyle}>
-        目前是簡化版本，先確認
+        目前是極簡版畫面，先確認
         <span style={highlightStyle}> build OK</span>
-        ，之後再把完整追蹤功能慢慢加回來 🌸
+        ，之後再把完整週期追蹤功能慢慢加回來 🌸
       </p>
     </div>
   );
