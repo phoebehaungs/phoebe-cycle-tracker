@@ -535,7 +535,7 @@ const PhoebeCycleTracker: React.FC = () => {
                     setEditDate(lastStartDate); 
                     setEditMode(true);
                   }}
-                  style={editButtonInlineStyle}
+                  style={editButtonFinalStyle} // 使用修正後的樣式
               >
                   修改本週期
               </button>
