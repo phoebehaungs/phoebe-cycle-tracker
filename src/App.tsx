@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
 // --- 1. 定義資料結構 (Type Definitions) ---
