@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
 // --- 1. 定義資料結構 (Type Definitions) ---
@@ -24,7 +23,7 @@ interface CycleRecord {
 }
 
 interface SymptomRecord {
-  date: string;
+  date: string; 
   appetite: '低' | '中' | '高' | '';
   mood: '穩定' | '敏感/焦慮' | '低落' | '';
   body: '無水腫' | '微水腫' | '水腫明顯' | '';
@@ -61,13 +60,13 @@ const PHASE_RULES: PhaseDefinition[] = [
     care: [
       '不需要逼自己運動',
       '多喝暖身飲（紅棗黑豆枸杞茶）',
-      '早餐多一點蛋白質（減少下午嘴饞）',
+      '早餐多一點蛋白質（減少下午嘴饞）'
     ],
     tips: '這段是妳最「穩定」的時候，適合讓身體慢慢調整。',
     color: '#E95A85',
     lightColor: '#FFE7EE',
     hormone: '雌激素與黃體素低點',
-    accent: '#D63A7F',
+    accent: '#D63A7F'
   },
   {
     name: '濾泡期 (黃金期)',
@@ -78,13 +77,13 @@ const PHASE_RULES: PhaseDefinition[] = [
     care: [
       '最適合：規律吃、穩定作息',
       '若想減脂，這段最容易有成果',
-      '不需要逼運動，但 Zumba/伸展效果好',
+      '不需要逼運動，但 Zumba/伸展效果好'
     ],
     tips: '如果妳希望建立新習慣，這段最成功。',
     color: '#6AB04C',
     lightColor: '#E9F5E3',
     hormone: '雌激素逐漸上升',
-    accent: '#4CB582',
+    accent: '#4CB582'
   },
   {
     name: '排卵期',
@@ -92,12 +91,15 @@ const PHASE_RULES: PhaseDefinition[] = [
     endDay: 27,
     symptoms: ['可能出現輕微下腹悶、體溫升高', '精力正常', '水腫開始慢慢回來'],
     diet: ['食慾稍微上升'],
-    care: ['多喝水、多吃蔬菜', '增加可溶性纖維（玉米、地瓜）維持血糖穩定'],
+    care: [
+      '多喝水、多吃蔬菜',
+      '增加可溶性纖維（玉米、地瓜）維持血糖穩定'
+    ],
     tips: '這段是往黃體期過渡，通常會是出現變化的開始。',
     color: '#FFB84D',
     lightColor: '#FFF3E0',
     hormone: '黃體生成素(LH)高峰',
-    accent: '#F49B00',
+    accent: '#F49B00'
   },
   {
     name: '黃體期前段',
@@ -105,12 +107,14 @@ const PHASE_RULES: PhaseDefinition[] = [
     endDay: 29,
     symptoms: ['覺得比較容易累', '情緒敏感'],
     diet: ['開始有嘴饞的跡象', '想吃東西頻率變高'],
-    care: ['提前保護：早餐加蛋白質、下午安全點心、每餐加纖維'],
+    care: [
+      '提前保護：早餐加蛋白質、下午安全點心、每餐加纖維'
+    ],
     tips: '提前兩天準備，比發生後補救更有效。',
     color: '#8396D1',
     lightColor: '#E6E9F5',
     hormone: '黃體素開始上升',
-    accent: '#896CD9',
+    accent: '#896CD9'
   },
   {
     name: 'PMS 高峰',
@@ -122,21 +126,21 @@ const PHASE_RULES: PhaseDefinition[] = [
       '維持血糖穩定 (早餐+蛋白質/下午安全點心/纖維)',
       '補充鎂（減少焦慮和暴食衝動）',
       '允許自己多吃 5～10% (降低暴食感)',
-      '情緒安撫組 (熱茶/小毯子/深呼吸)',
+      '情緒安撫組 (熱茶/小毯子/深呼吸)'
     ],
     tips: '這是妳最辛苦、最典型的 PMS 時段，請對自己特別溫柔對待。',
     color: '#C76A9A',
     lightColor: '#F4E5ED',
     hormone: '黃體素高峰 / 準備下降',
-    accent: '#D1589F',
-  },
+    accent: '#D1589F'
+  }
 ];
 
 const SYMPTOM_OPTIONS = {
   appetite: ['低', '中', '高'],
   mood: ['穩定', '敏感/焦慮', '低落'],
   body: ['無水腫', '微水腫', '水腫明顯'],
-  sleep: ['良好', '普通', '睡不好'],
+  sleep: ['良好', '普通', '睡不好']
 };
 
 // --- 4. Helper functions ---
@@ -151,8 +155,8 @@ const getFormattedDate = (date: Date): string => {
 const getDaysDifference = (date1: string, date2: string): number => {
   const d1 = new Date(date1);
   const d2 = new Date(date2);
-  d1.setHours(0, 0, 0, 0);
-  d2.setHours(0, 0, 0, 0);
+  d1.setHours(0,0,0,0);
+  d2.setHours(0,0,0,0);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
@@ -174,7 +178,7 @@ const createEmptyRecord = (date: string): SymptomRecord => ({
   mood: '',
   body: '',
   sleep: '',
-  notes: '',
+  notes: ''
 });
 
 // --- 5. 主組件 ---
@@ -216,7 +220,7 @@ const PhoebeCycleTracker: React.FC = () => {
   const [currentRecord, setCurrentRecord] = useState<SymptomRecord | null>(null);
 
   const [editMode, setEditMode] = useState(false);
-  const [editCycleLength, setEditCycleLength] = useState(5); // 生理期天數
+  const [editCycleLength, setEditCycleLength] = useState(34);
   const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
 
   // 取得現在週期
@@ -230,7 +234,7 @@ const PhoebeCycleTracker: React.FC = () => {
   }, [lastStartDate, todayStr]);
 
   const averageCycleLength = useMemo(() => {
-    const completed = history.filter((h) => h.length !== null);
+    const completed = history.filter(h => h.length !== null);
     if (completed.length === 0) return 34;
     const total = completed.reduce((s, h) => s + (h.length || 0), 0);
     return Math.round(total / completed.length);
@@ -238,7 +242,7 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const currentPhase = useMemo(() => {
     const found = PHASE_RULES.find(
-      (p) => daysPassed >= p.startDay && daysPassed <= p.endDay,
+      p => daysPassed >= p.startDay && daysPassed <= p.endDay
     );
     const last = PHASE_RULES[PHASE_RULES.length - 1];
     return found || last;
@@ -251,71 +255,9 @@ const PhoebeCycleTracker: React.FC = () => {
     return Math.min(100, (daysPassed / averageCycleLength) * 100);
   }, [daysPassed, averageCycleLength]);
 
-  // PMS 狀態描述
-  const PMS_START = 30;
-  const PMS_END = 33;
-
-  const pmsInfo = useMemo(() => {
-    if (daysPassed < PMS_START) {
-      const daysUntil = PMS_START - daysPassed;
-      return {
-        label: '尚未進入 PMS',
-        detail: `距離 PMS 高峰大約還有 ${daysUntil} 天。`,
-        tag: daysUntil <= 3 ? '準備期' : '黃金期',
-      };
-    }
-    if (daysPassed >= PMS_START && daysPassed <= PMS_END) {
-      const dayInPMS = daysPassed - PMS_START + 1;
-      return {
-        label: 'PMS 中',
-        detail: `目前是 PMS 第 ${dayInPMS} 天，這幾天可以對自己溫柔一點。`,
-        tag: '風暴期',
-      };
-    }
-    return {
-      label: 'PMS 已結束',
-      detail: '這個週期的 PMS 已經過去了，身體正在慢慢回到比較舒服的狀態。',
-      tag: '恢復期',
-    };
-  }, [daysPassed]);
-
-  // 今日三件小事
-  const todayTasks = useMemo(() => {
-    if (daysPassed >= PMS_START && daysPassed <= PMS_END) {
-      // PMS 高峰
-      return [
-        '允許自己多吃約 5～10%，不用為了壓抑食慾而責怪自己',
-        '準備一份「安全點心」（地瓜、無糖豆漿、海苔…）放在身邊',
-        '睡前留 10 分鐘做伸展或喝熱飲，幫身體收尾',
-      ];
-    }
-    if (daysPassed >= 28 && daysPassed < PMS_START) {
-      // 黃體期前段：準備期
-      return [
-        '早餐多加一份蛋白質，幫 PMS 做預先防護',
-        '提前準備一份不會有罪惡感的下午點心',
-        '晚上先排一個只屬於妳的 10 分鐘放鬆時間',
-      ];
-    }
-    if (daysPassed <= 6) {
-      // 生理期
-      return [
-        '今天可以不運動，專心讓身體休息是可以被允許的',
-        '補充一杯溫熱飲（像是紅棗黑豆枸杞茶）',
-        '若有情緒起伏，可以在備註寫下一句對自己的話',
-      ];
-    }
-    // 其他階段
-    return [
-      '維持規律吃飯，不空腹硬撐，讓血糖穩穩的',
-      '選一個最輕鬆的運動或伸展 10 分鐘就好',
-      '睡前對今天的自己說一句「謝謝你撐過今天」',
-    ];
-  }, [daysPassed]);
-
   const getSymptomRecordForDate = useCallback(
-    (dateStr: string) => symptomRecords.find((r) => r.date === dateStr),
-    [symptomRecords],
+    (dateStr: string) => symptomRecords.find(r => r.date === dateStr),
+    [symptomRecords]
   );
 
   // 取得某日期所屬階段
@@ -332,7 +274,7 @@ const PhoebeCycleTracker: React.FC = () => {
           if (dateStr >= s && dateStr <= e) {
             const day = getDaysDifference(s, dateStr) + 1;
             return PHASE_RULES.find(
-              (p) => day >= p.startDay && day <= p.endDay,
+              p => day >= p.startDay && day <= p.endDay
             );
           }
         }
@@ -343,14 +285,14 @@ const PhoebeCycleTracker: React.FC = () => {
       if (dateStr >= cur.startDate) {
         const day = getDaysDifference(cur.startDate, dateStr) + 1;
         const found = PHASE_RULES.find(
-          (p) => day >= p.startDay && day <= p.endDay,
+          p => day >= p.startDay && day <= p.endDay
         );
         return found || PHASE_RULES[PHASE_RULES.length - 1];
       }
 
       return undefined;
     },
-    [history],
+    [history]
   );
 
   // 產生月曆格子
@@ -416,7 +358,7 @@ const PhoebeCycleTracker: React.FC = () => {
       date: dateStr,
       day: cycleDay,
       phase,
-      record,
+      record
     });
   };
 
@@ -433,7 +375,7 @@ const PhoebeCycleTracker: React.FC = () => {
     if (!currentRecord) return;
 
     const date = currentRecord.date;
-    const idx = symptomRecords.findIndex((r) => r.date === date);
+    const idx = symptomRecords.findIndex(r => r.date === date);
 
     const isBlank =
       currentRecord.appetite === '' &&
@@ -457,20 +399,18 @@ const PhoebeCycleTracker: React.FC = () => {
 
     setModalDetail(null);
     setCurrentRecord(null);
-    alert(
-      `已紀錄 ${date} 的狀態。願意停下來看一下自己今天過得怎麼樣，本身就是很棒的照顧。`,
-    );
+    alert(`已儲存 ${date} 的個人紀錄。`);
   };
 
   // 新增週期開始
   const handleNewPeriodRecord = () => {
-    if (!window.confirm(`確定要在 ${inputDate} 設定「這次生理期第一天」嗎？`)) return;
+    if (!window.confirm(`確定要在 ${inputDate} 開始新的生理期嗎？`)) return;
 
     const newStart = inputDate;
     const prevLength = getDaysDifference(lastStartDate, newStart);
 
     if (prevLength <= 0) {
-      alert('錯誤：新的開始日不能早於或等於上一個開始日！');
+      alert("錯誤：新的開始日不能早於或等於上一個開始日！");
       return;
     }
 
@@ -479,21 +419,21 @@ const PhoebeCycleTracker: React.FC = () => {
     updated.push({
       id: Date.now().toString(),
       startDate: newStart,
-      length: null,
+      length: null
     });
 
     setHistory(updated);
     setCurrentMonth(new Date(newStart));
   };
 
-  // 儲存週期編輯（這裡主要調整開始日期，生理期天數目前只是記錄給妳參考）
+  // 儲存週期編輯
   const handleSaveEdit = () => {
     const updated = [...history];
 
     if (updated.length >= 2) {
       const prev = getDaysDifference(
         updated[updated.length - 2].startDate,
-        editDate,
+        editDate
       );
       updated[updated.length - 2].length = prev;
     }
@@ -503,7 +443,6 @@ const PhoebeCycleTracker: React.FC = () => {
     setHistory(updated);
     setCurrentMonth(new Date(editDate));
     setEditMode(false);
-    alert('本次週期的開始日期已更新。生理期天數記錄則可以未來拿來做統計、自己參考。');
   };
 
   // 改月曆月份
@@ -522,8 +461,7 @@ const PhoebeCycleTracker: React.FC = () => {
   useEffect(() => {
     if (editMode) {
       setEditDate(lastStartDate);
-      // 這裡可以先用平均週期長度／5 天預設
-      setEditCycleLength(5);
+      setEditCycleLength(averageCycleLength);
     }
   }, [editMode, lastStartDate, averageCycleLength]);
 
@@ -533,9 +471,11 @@ const PhoebeCycleTracker: React.FC = () => {
 
   return (
     <div style={appContainerStyle}>
+
       {/* Header */}
       <header style={headerStyle}>
         <h1 style={headerTitleStyle}>PMS大作戰</h1>
+        <div style={{ width: '20px' }}></div>
       </header>
 
       {/* Dashboard */}
@@ -552,11 +492,7 @@ const PhoebeCycleTracker: React.FC = () => {
         {/* Today Info */}
         <div style={todayStatusContainerStyle}>
           <span style={todayDateStyle}>
-            {new Date().toLocaleDateString('zh-TW', {
-              month: 'numeric',
-              day: 'numeric',
-            })}
-            日
+            {new Date().toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
           </span>
           <span style={todayLabelStyle}>今天</span>
 
@@ -607,9 +543,6 @@ const PhoebeCycleTracker: React.FC = () => {
             </div>
             <div style={{ color: '#888', fontSize: '0.9rem' }}>
               預計下次開始：{nextPeriodDate}
-            </div>
-            <div style={{ color: '#888', fontSize: '0.85rem', marginTop: 4 }}>
-              PMS 狀態：{pmsInfo.detail}
             </div>
           </div>
         </div>
@@ -684,7 +617,7 @@ const PhoebeCycleTracker: React.FC = () => {
                   opacity: isCurrentMonth ? 1 : 0.6,
                   border: isPeriodStart
                     ? `2px solid ${phase?.accent || '#E95A85'}`
-                    : '1px solid '#eee',
+                    : '1px solid #eee',
                   cursor: phase ? 'pointer' : 'default',
                 }}
               >
@@ -758,7 +691,6 @@ const PhoebeCycleTracker: React.FC = () => {
           }}
         >
           <h3 style={cardTitleStyle}>這次生理期第一天</h3>
-
           <p
             style={{
               fontSize: '0.85rem',
@@ -766,8 +698,8 @@ const PhoebeCycleTracker: React.FC = () => {
               marginBottom: '8px',
             }}
           >
-            生理期來的當天，在這裡選日期按下「儲存」。
-            如果事後發現日期填錯，可以用上方的「修改本週期」調整。
+            生理期來的當天，在這裡選日期並按下「儲存」。如果事後發現日期填錯，
+            可以用上方的「修改本週期」調整這次的開始日。
           </p>
 
           <input
@@ -783,13 +715,15 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Phase Tips + 今日三件小事 */}
+      {/* Phase Tips */}
       <div style={{ display: 'grid', gap: '15px', marginTop: '30px' }}>
         <div style={{ ...cardStyle, backgroundColor: currentPhase.lightColor }}>
           <h3 style={{ ...cardTitleStyle, color: currentPhase.color }}>
             💡 溫馨小提醒
           </h3>
-          <p style={{ fontSize: '1rem', color: '#555' }}>{currentPhase.tips}</p>
+          <p style={{ fontSize: '1rem', color: '#555' }}>
+            {currentPhase.tips}
+          </p>
         </div>
 
         {/* Symptoms */}
@@ -815,16 +749,6 @@ const PhoebeCycleTracker: React.FC = () => {
           <ul style={listListStyle}>
             {currentPhase.care.map((c, i) => (
               <li key={i}>{c}</li>
-            ))}
-          </ul>
-        </div>
-
-        {/* 今日三件小事 */}
-        <div style={cardStyle}>
-          <h3 style={cardTitleStyle}>🧡 今日三件小事</h3>
-          <ul style={listListStyle}>
-            {todayTasks.map((t, i) => (
-              <li key={i}>{t}</li>
             ))}
           </ul>
         </div>
@@ -858,7 +782,7 @@ const PhoebeCycleTracker: React.FC = () => {
               {[...modalDetail.phase.symptoms, ...modalDetail.phase.diet].map(
                 (s, i) => (
                   <li key={i}>{s}</li>
-                ),
+                )
               )}
             </ul>
 
@@ -901,20 +825,6 @@ const PhoebeCycleTracker: React.FC = () => {
                 value={currentRecord.sleep}
                 onChange={(v) => handleRecordChange('sleep', v)}
               />
-
-              {currentRecord.appetite === '高' &&
-                currentRecord.mood === '敏感/焦慮' && (
-                  <p
-                    style={{
-                      fontSize: '0.85rem',
-                      color: '#777',
-                      marginTop: '5px',
-                    }}
-                  >
-                    這種「食慾高 + 情緒敏感」的組合在 PMS 很常見，代表荷爾蒙正在工作，
-                    不是妳意志力不好。
-                  </p>
-                )}
 
               {/* Notes */}
               <div style={{ marginTop: '10px' }}>
@@ -983,7 +893,7 @@ const PhoebeCycleTracker: React.FC = () => {
             <h3 style={{ color: PHASE_RULES[3].accent }}>📅 修改本次週期</h3>
 
             <p style={{ marginBottom: '8px' }}>
-              現在紀錄中的這次生理期第一天：<strong>{lastStartDate}</strong>
+              目前紀錄的這次生理期第一天：<strong>{lastStartDate}</strong>
             </p>
 
             <label>新的生理期第一天：</label>
@@ -1001,21 +911,12 @@ const PhoebeCycleTracker: React.FC = () => {
               type="number"
               value={editCycleLength}
               onChange={(e) =>
-                setEditCycleLength(parseInt(e.target.value) || 5)
+                setEditCycleLength(parseInt(e.target.value) || 34)
               }
               min={1}
               max={10}
               style={inputStyle}
             />
-            <p
-              style={{
-                fontSize: '0.8rem',
-                color: '#888',
-                marginTop: '4px',
-              }}
-            >
-              目前主要是給妳自己參考的欄位，未來如果要做更細的圖表，可以再拿來一起用。
-            </p>
 
             <div
               style={{
@@ -1029,6 +930,8 @@ const PhoebeCycleTracker: React.FC = () => {
                 style={{
                   ...modalCloseButtonStyle,
                   backgroundColor: '#aaa',
+                  width: '48%',
+                  marginTop: 0,
                 }}
               >
                 取消
@@ -1039,9 +942,11 @@ const PhoebeCycleTracker: React.FC = () => {
                 style={{
                   ...modalCloseButtonStyle,
                   backgroundColor: PHASE_RULES[3].accent,
+                  width: '48%',
+                  marginTop: 0,
                 }}
               >
-                儲存
+                儲存修改
               </button>
             </div>
           </div>
@@ -1096,7 +1001,7 @@ const RecordDropdown: React.FC<RecordDropdownProps> = ({
   </div>
 );
 
-// --- Styles ---
+// --- Styles (已移除不用的 backButtonStyle) ---
 
 const appContainerStyle: React.CSSProperties = {
   maxWidth: '600px',
@@ -1109,7 +1014,7 @@ const appContainerStyle: React.CSSProperties = {
 
 const headerStyle: React.CSSProperties = {
   display: 'flex',
-  justifyContent: 'center',
+  justifyContent: 'space-between',
   alignItems: 'center',
   padding: '15px 0',
   marginBottom: '10px',
@@ -1128,7 +1033,6 @@ const editButtonInlineStyle: React.CSSProperties = {
   color: PHASE_RULES[3].accent,
   fontWeight: 'bold',
   cursor: 'pointer',
-  marginLeft: 'auto',
 };
 
 const todayStatusContainerStyle: React.CSSProperties = {
@@ -1156,7 +1060,7 @@ const cardStyle: React.CSSProperties = {
 
 const cardTitleStyle: React.CSSProperties = {
   fontSize: '1.1rem',
-  borderBottom: '2px solid #eee',
+  borderBottom: '2px solid '#eee',
   paddingBottom: '5px',
   marginBottom: '10px',
 };
