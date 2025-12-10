@@ -9,6 +9,7 @@ interface PhaseDefinition {
   symptoms: string[];
   care: string[];
   diet: string[];
+  tips: string; // 新增：溫馨小提醒
   color: string;
   hormone: string; 
   lightColor: string;
@@ -55,10 +56,15 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '生理期',
     startDay: 1,
     endDay: 6,
-    symptoms: ['疲倦', '想休息', '子宮悶感'],
-    diet: ['食慾低～中', '想吃冰', '多補充蛋白質'],
-    care: ['不逼自己運動', '多喝紅棗黑豆枸杞茶', '早餐多蛋白質'],
-    color: '#E95A85', // 柔和紅/桃粉
+    symptoms: ['疲倦、容易想休息', '偶爾子宮悶感', '心情比較安靜'],
+    diet: ['食慾偏低或正常', '想吃冰（典型的荷爾蒙反應）'],
+    care: [
+        '不需要逼自己運動',
+        '多喝暖身飲（紅棗黑豆枸杞茶）',
+        '早餐多一點蛋白質（減少下午嘴饞）'
+    ],
+    tips: '這段是妳最「穩定」的時候，適合讓身體慢慢調整。',
+    color: '#FF6F91', // 紅色/桃粉
     lightColor: '#FFE7EE', 
     hormone: '雌激素與黃體素低點',
     accent: '#D63A7F',
@@ -67,9 +73,14 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '濾泡期 (黃金期)',
     startDay: 7,
     endDay: 24,
-    symptoms: ['精力恢復', '心情穩定', '身體輕盈'],
-    diet: ['食慾最低', '最好控制', '飽足感良好'],
-    care: ['適合減脂', '建立新習慣', 'Zumba / 伸展'],
+    symptoms: ['精力恢復', '心情平穩', '身體比較輕盈、水腫減少'],
+    diet: ['最容易控制', '食慾最低的階段', '飽足感良好'],
+    care: [
+        '最適合：規律吃、穩定作息',
+        '若想減脂，這段最容易有成果',
+        '不需要逼運動，但 Zumba/伸展效果好'
+    ],
+    tips: '如果妳希望建立新習慣，這段最成功。',
     color: '#6AB04C', // 溫和綠色
     lightColor: '#E9F5E3',
     hormone: '雌激素逐漸上升',
@@ -79,9 +90,13 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '排卵期',
     startDay: 25,
     endDay: 27,
-    symptoms: ['微水腫', '下腹不適', '體溫升高'],
-    diet: ['食慾微增', '有些人想吃甜'],
-    care: ['多喝水', '多吃蔬菜', '補充可溶性纖維(地瓜)'],
+    symptoms: ['可能出現輕微下腹悶、體溫升高', '精力正常', '水腫開始慢慢回來'],
+    diet: ['食慾稍微上升'],
+    care: [
+        '多喝水、多吃蔬菜',
+        '增加可溶性纖維（玉米、地瓜）維持血糖穩定'
+    ],
+    tips: '這段是往黃體期過渡，通常會是出現變化的開始。',
     color: '#FFB84D', // 柔和橘黃
     lightColor: '#FFF3E0',
     hormone: '黃體生成素(LH)高峰',
@@ -91,9 +106,12 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '黃體期前段',
     startDay: 28,
     endDay: 29,
-    symptoms: ['情緒敏感', '容易累'],
-    diet: ['開始嘴饞', '想吃頻率變高'],
-    care: ['提前保護血糖', '下午準備安全點心', '每餐加纖維'],
+    symptoms: ['覺得比較容易累', '情緒敏感'],
+    diet: ['開始有嘴饞的跡象', '想吃東西頻率變高'],
+    care: [
+        '提前保護：早餐加蛋白質、下午一份安全點心、每餐加纖維'
+    ],
+    tips: '提前兩天準備，比發生後補救更有效。',
     color: '#8396D1', // 柔和藍
     lightColor: '#E6E9F5',
     hormone: '黃體素開始上升',
@@ -103,9 +121,15 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: 'PMS 高峰',
     startDay: 30,
     endDay: 33, 
-    symptoms: ['焦慮', '睡不好', '水腫', '罪惡感', '子宮收縮'],
-    diet: ['想吃甜/冰', '正餐後還想吃', '食慾高峰'],
-    care: ['補充鎂', '低負擔運動(伸展)', '允許自己多吃 5-10%', '深呼吸'],
+    symptoms: ['焦慮、情緒容易緊繃', '睡不好、水腫', '子宮微微收縮', '身心都比較沒安全感'],
+    diet: ['想吃甜、想吃冰', '正餐後仍想吃、吃完有罪惡感'],
+    care: [
+        '維持血糖穩定 (早餐+蛋白質/下午安全點心/纖維)',
+        '補充鎂（減少焦慮和暴食衝動）',
+        '允許自己多吃 5～10% (降低暴食感)',
+        '情緒安撫組 (熱茶/小毯子/深呼吸)'
+    ],
+    tips: '這是妳最辛苦、最典型的 PMS 時段，請對自己特別溫柔對待。',
     color: '#C76A9A', // 偏紅紫
     lightColor: '#F4E5ED',
     hormone: '黃體素高峰 / 準備下降',
@@ -448,9 +472,6 @@ const PhoebeCycleTracker: React.FC = () => {
       // 2. 修改當前週期的開始日期
       updatedHistory[updatedHistory.length - 1].startDate = editDate;
       
-      // 雖然 editCycleLength 沒直接寫入當前週期的 length (因為它還沒結束)，
-      // 但我們在這裡將其作為一個新值，在下次記錄時會影響平均值。
-
       setHistory(updatedHistory);
       setCurrentMonth(new Date(editDate));
       setEditMode(false);
@@ -489,61 +510,71 @@ const PhoebeCycleTracker: React.FC = () => {
     return (
       <div style={appContainerStyle}>
         
-        {/* 標題區 */}
-        <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h1 style={{ color: '#4a4a4a', fontSize: '1.8rem', marginBottom: '5px' }}>Phoebe 週期追蹤</h1>
-          <p style={{ color: '#888', fontSize: '1rem', margin: 0 }}>
-            平均週期: <strong>{averageCycleLength}</strong> 天
-          </p>
+        {/* 標題區 (頂部導航欄) */}
+        <header style={headerStyle}>
+            <button style={backButtonStyle}>&lt;</button>
+            <h1 style={headerTitleStyle}>經期追蹤</h1>
+            <div style={{width: '20px'}}></div> {/* 佔位符 */}
         </header>
 
-        {/* 1. 核心儀表板 - 圓餅圖進度條與狀態 */}
+        {/* 核心儀表板 - 圓餅圖進度條與狀態 */}
         <div style={{
             ...cardStyle,
-            backgroundColor: currentPhase.lightColor, 
-            padding: '30px 20px', 
+            backgroundColor: 'white', 
+            padding: '20px', 
             textAlign: 'center', 
-            border: `1px solid ${currentPhase.lightColor}`, 
             marginBottom: '20px',
         }}>
-          
-          <div style={circularChartContainerStyle}>
-             {/* 圓環進度條 (CSS 實現) */}
-            <div style={{
-                ...circularChartStyle,
-                background: `conic-gradient(${currentPhase.color} ${progressPercent}%, #f0f0f0 ${progressPercent}%)`,
-            }}>
-                <div style={circularChartInnerStyle}>
-                    <div style={{ fontSize: '1rem', color: '#666' }}>Cycle Day</div>
-                    <div style={{ fontSize: '3rem', fontWeight: 'bold', color: '#4a4a4a', lineHeight: 1 }}>
-                        {daysPassed}
-                    </div>
-                </div>
-            </div>
-          </div>
-          
-          <div style={{ marginTop: '20px' }}>
-              <div style={{ 
-                display: 'inline-block', 
-                backgroundColor: currentPhase.color, 
-                color: 'white', 
-                padding: '8px 20px', 
-                borderRadius: '25px', 
-                fontWeight: 'bold',
-                fontSize: '1.1rem'
-              }}>
-                {currentPhase.name}
-              </div>
-              <button 
+            {/* 今日日期與狀態標記 */}
+            <div style={todayStatusContainerStyle}>
+                <span style={todayDateStyle}>{new Date().toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日</span>
+                <span style={todayLabelStyle}>今天</span>
+                <button 
                   onClick={() => {
                     setEditDate(lastStartDate); 
                     setEditMode(true);
                   }}
-                  style={editButtonStyle}
+                  style={editButtonInlineStyle}
               >
-                  修改本週期開始日
+                  修改本週期
               </button>
-          </div>
+            </div>
+
+
+            <div style={circularChartContainerStyle}>
+                {/* 圓環進度條 (CSS 實現) */}
+                <div style={{
+                    ...circularChartStyle,
+                    background: `conic-gradient(${currentPhase.color} ${progressPercent}%, #f0f0f0 ${progressPercent}%)`,
+                }}>
+                    <div style={circularChartInnerStyle}>
+                        <div style={{ fontSize: '1rem', color: '#666' }}>Cycle Day</div>
+                        <div style={{ fontSize: '3rem', fontWeight: 'bold', color: '#4a4a4a', lineHeight: 1 }}>
+                            {daysPassed}
+                        </div>
+                    </div>
+                </div>
+                
+                {/* 狀態文字 */}
+                <div style={statusTextStyle}>
+                    <div style={{color: currentPhase.accent, fontWeight: 'bold', fontSize: '1.2rem'}}>{currentPhase.name}</div>
+                    <div style={{color: '#888', fontSize: '0.9rem'}}>預計下次開始：{nextPeriodDate}</div>
+                </div>
+            </div>
+            
+            <div style={{ marginTop: '20px' }}>
+                <div style={{ 
+                    display: 'inline-block', 
+                    backgroundColor: currentPhase.color, 
+                    color: 'white', 
+                    padding: '8px 20px', 
+                    borderRadius: '25px', 
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem'
+                }}>
+                    {currentPhase.hormone}
+                </div>
+            </div>
         </div>
         
         {/* 2. 月曆區塊 */}
@@ -613,11 +644,11 @@ const PhoebeCycleTracker: React.FC = () => {
               <h3 style={cardTitleStyle}>🔮 下次預測</h3>
               <div style={{ marginBottom: '15px' }}>
                 <div style={predictionLabelStyle}>下次 PMS 高峰 (黃體後期)：</div>
-                <strong style={{...predictionDateStyle, color: PHASE_RULES[4].color}}>{nextPMSDate}</strong>
+                <strong style={{...predictionDateStyle, color: PHASE_RULES[4].accent}}>{nextPMSDate}</strong>
               </div>
               <div>
                 <div style={predictionLabelStyle}>下次生理期預計開始：</div>
-                <strong style={{...predictionDateStyle, color: PHASE_RULES[0].color}}>{nextPeriodDate}</strong>
+                <strong style={{...predictionDateStyle, color: PHASE_RULES[0].accent}}>{nextPeriodDate}</strong>
               </div>
             </div>
             
@@ -642,21 +673,26 @@ const PhoebeCycleTracker: React.FC = () => {
         {/* 4. 當前週期建議卡片 */}
         <div style={{ display: 'grid', gap: '15px', marginTop: '30px' }}>
           
+          {/* 溫馨提醒 */}
+          <div style={{...cardStyle, backgroundColor: currentPhase.lightColor}}>
+              <h3 style={{...cardTitleStyle, color: currentPhase.color}}>💡 溫馨小提醒</h3>
+              <p style={{fontSize: '1rem', color: '#555'}}>{currentPhase.tips}</p>
+          </div>
+          
           {/* 症狀區 */}
           <div style={cardStyle}>
-            <h3 style={cardTitleStyle}>🌡️ 當前症狀總結</h3>
+            <h3 style={cardTitleStyle}>🌡️ 身體症狀與食慾</h3>
             <ul style={listListStyle}>
-              {currentPhase.symptoms.map((s, i) => <li key={i}>{s}</li>)}
+              {[...currentPhase.symptoms, ...currentPhase.diet].map((s, i) => <li key={i}>{s}</li>)}
             </ul>
           </div>
 
           {/* 照顧建議 (Action Items) */}
           <div style={{ ...cardStyle, border: `2px solid ${currentPhase.lightColor}` }}>
-            <h3 style={{ ...cardTitleStyle, color: currentPhase.color }}>💖 今日照顧清單</h3>
+            <h3 style={{ ...cardTitleStyle, color: currentPhase.color }}>💖 照顧方式</h3>
             <ul style={listListStyle}>
               {currentPhase.care.map((s, i) => (
                 <li key={i} style={{ marginBottom: '8px' }}>
-                  <input type="checkbox" style={{ marginRight: '10px' }} />
                   {s}
                 </li>
               ))}
@@ -812,10 +848,66 @@ const RecordDropdown: React.FC<RecordDropdownProps> = ({ label, options, value, 
 const appContainerStyle: React.CSSProperties = {
     maxWidth: '600px', 
     margin: '0 auto',
-    padding: '20px',
+    padding: '0 20px 20px 20px', // 減少頂部 padding
     fontFamily: 'sans-serif',
     backgroundColor: '#faf9f6',
     minHeight: '100vh'
+};
+
+// 頂部導航欄樣式
+const headerStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '15px 0',
+    marginBottom: '10px',
+    backgroundColor: 'white', // 模擬白色導航欄
+    top: 0,
+    zIndex: 10,
+};
+
+const backButtonStyle: React.CSSProperties = {
+    backgroundColor: 'transparent',
+    border: 'none',
+    fontSize: '1.5rem',
+    color: '#333',
+    cursor: 'pointer',
+};
+
+const headerTitleStyle: React.CSSProperties = {
+    fontSize: '1.2rem',
+    fontWeight: 'normal',
+    color: '#333',
+    margin: 0,
+};
+
+const todayStatusContainerStyle: React.CSSProperties = {
+    textAlign: 'left',
+    marginBottom: '20px',
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '8px',
+};
+
+const todayDateStyle: React.CSSProperties = {
+    fontSize: '1.5rem',
+    fontWeight: 'bold',
+    color: '#333',
+};
+
+const todayLabelStyle: React.CSSProperties = {
+    fontSize: '1.1rem',
+    color: '#666',
+};
+
+const editButtonInlineStyle: React.CSSProperties = {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: PHASE_RULES[3].accent,
+    fontSize: '0.9rem',
+    cursor: 'pointer',
+    marginLeft: 'auto',
+    fontWeight: 'bold',
 };
 
 const cardStyle: React.CSSProperties = {
@@ -950,23 +1042,26 @@ const recordDotStyle: React.CSSProperties = {
 // --- 圓餅圖樣式 (Circular Progress Chart) ---
 const circularChartContainerStyle: React.CSSProperties = {
     display: 'flex',
-    justifyContent: 'center',
-    marginBottom: '20px',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginBottom: '10px',
+    marginTop: '20px',
 };
 
 const circularChartStyle: React.CSSProperties = {
-    width: '120px',
-    height: '120px',
+    width: '100px',
+    height: '100px',
     borderRadius: '50%',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
 };
 
 const circularChartInnerStyle: React.CSSProperties = {
-    width: '100px',
-    height: '100px',
+    width: '85px',
+    height: '85px',
     borderRadius: '50%',
     backgroundColor: 'white',
     display: 'flex',
@@ -974,6 +1069,12 @@ const circularChartInnerStyle: React.CSSProperties = {
     justifyContent: 'center',
     alignItems: 'center',
     textAlign: 'center',
+};
+
+const statusTextStyle: React.CSSProperties = {
+    textAlign: 'left',
+    marginLeft: '20px',
+    flexGrow: 1,
 };
 
 const symptomButtonStyle: React.CSSProperties = {
