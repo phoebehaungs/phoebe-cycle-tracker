@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
-// --- 1. 定義資料結構 ---
+// --- 1. 定義資料結構 (Type Definitions) ---
 
 interface PhaseDefinition {
   name: string;
@@ -20,7 +20,8 @@ interface PhaseDefinition {
 interface CycleRecord {
   id: string;
   startDate: string; // "YYYY-MM-DD"
-  length: number | null;
+  length: number | null; // 週期長度 (兩次月經間隔)
+  periodLength?: number; // 生理期出血天數 (預設 6)
 }
 
 interface SymptomRecord {
@@ -42,18 +43,19 @@ interface DateDetail {
 // --- 2. 初始資料與規則 ---
 
 const INITIAL_HISTORY: CycleRecord[] = [
-  { id: '1', startDate: '2025-11-05', length: 34 },
-  { id: '2', startDate: '2025-12-09', length: null },
+  { id: '1', startDate: '2025-11-05', length: 34, periodLength: 6 },
+  { id: '2', startDate: '2025-12-09', length: null, periodLength: 6 },
 ];
 
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
 
-const PHASE_RULES: PhaseDefinition[] = [
+// 基礎規則 (天數將根據 periodLength 動態調整)
+const BASE_PHASE_RULES: PhaseDefinition[] = [
   {
     name: '生理期',
     startDay: 1,
-    endDay: 6,
+    endDay: 6, // 預設值，會被動態覆蓋
     symptoms: ['疲倦、容易想休息', '偶爾子宮悶感', '心情比較安靜'],
     diet: ['食慾偏低或正常', '想吃冰（典型的荷爾蒙反應）'],
     care: [
@@ -69,7 +71,7 @@ const PHASE_RULES: PhaseDefinition[] = [
   },
   {
     name: '濾泡期 (黃金期)',
-    startDay: 7,
+    startDay: 7, // 預設值，會被動態覆蓋
     endDay: 24,
     symptoms: ['精力恢復', '心情平穩', '身體比較輕盈、水腫減少'],
     diet: ['最容易控制', '食慾最低的階段', '飽足感良好'],
@@ -180,6 +182,16 @@ const createEmptyRecord = (date: string): SymptomRecord => ({
   notes: ''
 });
 
+// 根據出血天數動態調整規則
+const getRulesForCycle = (periodLength: number = 6): PhaseDefinition[] => {
+  const rules = JSON.parse(JSON.stringify(BASE_PHASE_RULES));
+  // 調整生理期結束日
+  rules[0].endDay = periodLength;
+  // 調整濾泡期開始日 (緊接在生理期後)
+  rules[1].startDay = periodLength + 1;
+  return rules;
+};
+
 // --- 4. Main Component ---
 
 const PhoebeCycleTracker: React.FC = () => {
@@ -188,7 +200,6 @@ const PhoebeCycleTracker: React.FC = () => {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     try {
       const parsed = stored ? JSON.parse(stored) : INITIAL_HISTORY;
-      // 確保歷史紀錄按日期排序
       return parsed.sort((a: CycleRecord, b: CycleRecord) => 
         new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
       );
@@ -223,12 +234,13 @@ const PhoebeCycleTracker: React.FC = () => {
   const [currentRecord, setCurrentRecord] = useState<SymptomRecord | null>(null);
 
   const [editMode, setEditMode] = useState(false);
-  const [editCycleLength, setEditCycleLength] = useState(34);
+  const [editBleedingDays, setEditBleedingDays] = useState(6); // 出血天數
   const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
 
   // 核心計算
   const currentCycle = history[history.length - 1];
   const lastStartDate = currentCycle.startDate;
+  const currentPeriodLength = currentCycle.periodLength || 6;
   const todayStr = getFormattedDate(new Date());
 
   const daysPassed = useMemo(() => {
@@ -242,13 +254,18 @@ const PhoebeCycleTracker: React.FC = () => {
     return Math.round(total / completed.length);
   }, [history]);
 
+  // 動態獲取當前階段規則
+  const currentRules = useMemo(() => getRulesForCycle(currentPeriodLength), [currentPeriodLength]);
+
   const currentPhase = useMemo(() => {
-    const found = PHASE_RULES.find(
+    const found = currentRules.find(
       p => daysPassed >= p.startDay && daysPassed <= p.endDay
     );
-    const last = PHASE_RULES[PHASE_RULES.length - 1];
+    const last = currentRules[currentRules.length - 1];
+    // 如果超出最後定義的天數，仍顯示最後階段(PMS)
+    if (daysPassed > last.endDay) return last;
     return found || last;
-  }, [daysPassed]);
+  }, [daysPassed, currentRules]);
 
   const nextPeriodDate = addDays(lastStartDate, averageCycleLength);
   const nextPMSDate = addDays(nextPeriodDate, -7);
@@ -262,11 +279,12 @@ const PhoebeCycleTracker: React.FC = () => {
     [symptomRecords]
   );
 
+  // 取得某日期所屬階段 (支援歷史週期的不同出血天數)
   const getPhaseForDate = useCallback(
     (date: Date): PhaseDefinition | undefined => {
       const dateStr = getFormattedDate(date);
 
-      // 檢查歷史紀錄
+      // 1. 檢查歷史紀錄
       for (let i = history.length - 2; i >= 0; i--) {
         const h = history[i];
         if (h.length !== null) {
@@ -274,21 +292,23 @@ const PhoebeCycleTracker: React.FC = () => {
           const e = addDays(s, h.length - 1);
           if (dateStr >= s && dateStr <= e) {
             const day = getDaysDifference(s, dateStr) + 1;
-            return PHASE_RULES.find(
-              p => day >= p.startDay && day <= p.endDay
-            );
+            // 使用該歷史週期的出血天數來產生規則
+            const histRules = getRulesForCycle(h.periodLength || 6);
+            return histRules.find(p => day >= p.startDay && day <= p.endDay);
           }
         }
       }
 
-      // 檢查當前週期
+      // 2. 檢查當前週期
       const cur = history[history.length - 1];
       if (dateStr >= cur.startDate) {
         const day = getDaysDifference(cur.startDate, dateStr) + 1;
-        const found = PHASE_RULES.find(
-          p => day >= p.startDay && day <= p.endDay
-        );
-        return found || PHASE_RULES[PHASE_RULES.length - 1];
+        const curRules = getRulesForCycle(cur.periodLength || 6);
+        const found = curRules.find(p => day >= p.startDay && day <= p.endDay);
+        // 若超出範圍，顯示最後一期
+        const last = curRules[curRules.length - 1];
+        if (day > last.endDay) return last;
+        return found || last;
       }
       return undefined;
     },
@@ -329,7 +349,6 @@ const PhoebeCycleTracker: React.FC = () => {
     if (!phase) return;
 
     let cycleStart = lastStartDate;
-    // 簡單判斷所屬週期開始日
     if (dateStr < cycleStart) {
       for (let i = history.length - 2; i >= 0; i--) {
         const h = history[i];
@@ -383,13 +402,13 @@ const PhoebeCycleTracker: React.FC = () => {
     setCurrentRecord(null);
   };
 
-  // --- 關鍵修改：處理「這次生理期第一天」的智慧邏輯 ---
+  // 處理「這次生理期第一天」
   const handleUpsertPeriodRecord = () => {
     if (!inputDate) return;
     const newDateObj = new Date(inputDate);
     const newDateStr = getFormattedDate(newDateObj);
 
-    // 1. 檢查是否是同一月份的修改 (簡單判定：年份和月份相同)
+    // 1. 檢查同月份是否已有紀錄
     const existingIndex = history.findIndex(h => {
         const hDate = new Date(h.startDate);
         return hDate.getFullYear() === newDateObj.getFullYear() && 
@@ -397,7 +416,6 @@ const PhoebeCycleTracker: React.FC = () => {
     });
 
     if (existingIndex !== -1) {
-        // 發現同月份紀錄，詢問是否修改
         const oldDate = history[existingIndex].startDate;
         if (oldDate === newDateStr) {
             alert("該日期已經是生理期開始日了。");
@@ -407,15 +425,14 @@ const PhoebeCycleTracker: React.FC = () => {
             const updated = [...history];
             updated[existingIndex].startDate = newDateStr;
             
-            // 重新排序，確保時間線正確
             updated.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
             
-            // 修正上一週期的長度 (若有)
+            // 修正上一週期的長度
             if (existingIndex > 0) {
                 const prevStart = updated[existingIndex - 1].startDate;
                 updated[existingIndex - 1].length = getDaysDifference(prevStart, newDateStr);
             }
-            // 修正本週期的長度 (若後面還有紀錄)
+            // 修正本週期的長度
             if (existingIndex < updated.length - 1) {
                 const nextStart = updated[existingIndex + 1].startDate;
                 updated[existingIndex].length = getDaysDifference(newDateStr, nextStart);
@@ -428,11 +445,10 @@ const PhoebeCycleTracker: React.FC = () => {
         }
     }
 
-    // 2. 若非修改，則新增
-    if (!window.confirm(`確定要將 ${newDateStr} 設為新的生理期開始日嗎？`)) return;
+    // 2. 新增紀錄
+    if (!window.confirm(`確定要將 ${newDateStr} 設為這次生理期第一天嗎？`)) return;
 
     const updated = [...history];
-    // 計算與最後一筆的間隔作為上一期長度
     const lastRec = updated[updated.length - 1];
     const diff = getDaysDifference(lastRec.startDate, newDateStr);
     
@@ -441,7 +457,8 @@ const PhoebeCycleTracker: React.FC = () => {
         updated.push({
             id: Date.now().toString(),
             startDate: newDateStr,
-            length: null
+            length: null,
+            periodLength: 6 // 預設出血天數
         });
         setHistory(updated);
         setCurrentMonth(newDateObj);
@@ -459,12 +476,11 @@ const PhoebeCycleTracker: React.FC = () => {
       );
       updated[updated.length - 2].length = prev;
     }
-    updated[updated.length - 1].startDate = editDate;
     
-    // 這裡只是用來計算平均值，不直接寫入 length null
-    // 實際上 averageCycleLength 會自動根據歷史計算
-    // 用戶輸入的 'editCycleLength' 在此簡單版中主要作為參考或未來擴充
-    // 若要強制影響預測，可以存入 localStorage 或 state，目前先保持單純
+    // 更新開始日期
+    updated[updated.length - 1].startDate = editDate;
+    // 更新出血天數
+    updated[updated.length - 1].periodLength = editBleedingDays;
 
     setHistory(updated);
     setCurrentMonth(new Date(editDate));
@@ -486,9 +502,9 @@ const PhoebeCycleTracker: React.FC = () => {
   useEffect(() => {
     if (editMode) {
       setEditDate(lastStartDate);
-      setEditCycleLength(averageCycleLength);
+      setEditBleedingDays(currentPeriodLength);
     }
-  }, [editMode, lastStartDate, averageCycleLength]);
+  }, [editMode, lastStartDate, currentPeriodLength]);
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -496,7 +512,7 @@ const PhoebeCycleTracker: React.FC = () => {
     <div style={appContainerStyle}>
       {/* Header */}
       <header style={headerStyle}>
-        <div style={{ width: '20px' }}></div> {/* Spacer replacing back button */}
+        <div style={{ width: '20px' }}></div>
         <h1 style={headerTitleStyle}>PMS大作戰</h1>
         <div style={{ width: '20px' }}></div>
       </header>
@@ -671,7 +687,6 @@ const PhoebeCycleTracker: React.FC = () => {
             borderTop: `4px solid ${PHASE_RULES[1].color}`,
           }}
         >
-          {/* 修改標題 */}
           <h3 style={cardTitleStyle}>這次生理期第一天</h3>
           <input
             type="date"
@@ -679,7 +694,6 @@ const PhoebeCycleTracker: React.FC = () => {
             onChange={(e) => setInputDate(e.target.value)}
             style={inputStyle}
           />
-          {/* 修改按鈕觸發的函數 */}
           <button onClick={handleUpsertPeriodRecord} style={recordButtonStyle}>
             確認日期
           </button>
@@ -755,9 +769,8 @@ const PhoebeCycleTracker: React.FC = () => {
             <label style={{display: 'block', margin: '10px 0'}}>開始日期：</label>
             <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={inputStyle} />
             
-            {/* 修改標籤 */}
-            <label style={{display: 'block', margin: '15px 0 5px'}}>生理期天數 (週期長度)：</label>
-            <input type="number" value={editCycleLength} onChange={e => setEditCycleLength(parseInt(e.target.value) || 34)} style={inputStyle} />
+            <label style={{display: 'block', margin: '15px 0 5px'}}>生理期持續天數 (出血天數)：</label>
+            <input type="number" value={editBleedingDays} onChange={e => setEditBleedingDays(parseInt(e.target.value) || 6)} min={3} max={10} style={inputStyle} />
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button onClick={() => setEditMode(false)} style={{ ...baseButtonStyle, backgroundColor: '#ccc' }}>取消</button>
