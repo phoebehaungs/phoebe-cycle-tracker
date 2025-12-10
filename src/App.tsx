@@ -95,7 +95,7 @@ const PHASE_RULES: PhaseDefinition[] = [
   },
 ];
 
-// 上次週期（ID: 1, Start: 2025-11-05）的客製化歷史數據
+// 上次週期（ID: 1, Start: 2025-11-05）的客製化歷史數據 (保持不動，作為歷史摘要)
 const LAST_CYCLE_DETAILS = [
     {
         name: '生理期',
@@ -234,7 +234,7 @@ const PhoebeCycleTracker: React.FC = () => {
       const phase = PHASE_RULES.find(
         (p) => daysPassed >= p.startDay && daysPassed <= p.endDay
       );
-      // 如果超過了最長的結束日，則停留在最後一期
+      // 如果超過了最長的結束日，則停留在最後一期 (用於持續預測)
       const lastPhase = PHASE_RULES[PHASE_RULES.length - 1];
       if (daysPassed > lastPhase.endDay) return lastPhase; 
 
@@ -249,23 +249,51 @@ const PhoebeCycleTracker: React.FC = () => {
         return Math.min(100, (daysPassed / averageCycleLength) * 100);
     }, [daysPassed, averageCycleLength]);
 
-    // --- 月曆相關邏輯 ---
+    // --- 月曆相關邏輯 (已修正) ---
 
+    // 檢查日期屬於哪個週期，並返回對應的階段
     const getPhaseForDate = useCallback((date: Date): PhaseDefinition | undefined => {
-      const dateStr = getFormattedDate(date);
-      const diffDays = getDaysDifference(lastStartDate, dateStr) + 1;
+        const dateStr = getFormattedDate(date);
+        
+        // 1. 檢查所有已完成的歷史週期 (由近到遠)
+        // 排除最後一個 (currentCycle)
+        for (let i = history.length - 2; i >= 0; i--) {
+            const h = history[i];
+            if (h.length !== null) {
+                const cycleStartDate = h.startDate;
+                // 週期結束日 = 開始日 + 長度 - 1
+                const cycleEndDate = addDays(cycleStartDate, h.length - 1); 
 
-      if (date < new Date(lastStartDate)) return undefined; 
+                if (dateStr >= cycleStartDate && dateStr <= cycleEndDate) {
+                    const historicalDay = getDaysDifference(cycleStartDate, dateStr) + 1;
+                    return PHASE_RULES.find(
+                        (p) => historicalDay >= p.startDay && historicalDay <= p.endDay
+                    );
+                }
+            }
+        }
 
-      const phase = PHASE_RULES.find(
-        (p) => diffDays >= p.startDay && diffDays <= p.endDay
-      );
-      
-      const lastPhase = PHASE_RULES[PHASE_RULES.length - 1];
-      if (diffDays > lastPhase.endDay) return lastPhase;
-      
-      return phase;
-    }, [lastStartDate]);
+        // 2. 檢查當前不完整的週期
+        const currentCycle = history[history.length - 1];
+        const currentStartDate = currentCycle.startDate;
+
+        if (dateStr >= currentStartDate) {
+            const currentDay = getDaysDifference(currentStartDate, dateStr) + 1;
+            
+            const phase = PHASE_RULES.find(
+                (p) => currentDay >= p.startDay && currentDay <= p.endDay
+            );
+            
+            // 如果日期在未來，超出已定義的階段天數，則返回最後一期階段作為預測
+            const lastPhase = PHASE_RULES[PHASE_RULES.length - 1];
+            if (currentDay > lastPhase.endDay) return lastPhase; 
+
+            return phase;
+        }
+
+        // 3. 日期早於最早的紀錄
+        return undefined;
+    }, [history]);
 
 
     const generateCalendarDays = useMemo(() => {
@@ -326,10 +354,32 @@ const PhoebeCycleTracker: React.FC = () => {
     const handleDateClick = (date: Date) => {
         const phase = getPhaseForDate(date);
         if (phase) {
-            const day = getDaysDifference(lastStartDate, getFormattedDate(date)) + 1;
+            // 計算點擊日期相對應的週期日
+            let cycleDay = 0;
+            const dateStr = getFormattedDate(date);
+            const currentCycleStartDate = history[history.length - 1].startDate;
+
+            if (dateStr >= currentCycleStartDate) {
+                cycleDay = getDaysDifference(currentCycleStartDate, dateStr) + 1;
+            } else {
+                for (let i = history.length - 2; i >= 0; i--) {
+                    const h = history[i];
+                    if (h.length !== null) {
+                        const cycleStartDate = h.startDate;
+                        const cycleEndDate = addDays(cycleStartDate, h.length - 1);
+                        if (dateStr >= cycleStartDate && dateStr <= cycleEndDate) {
+                            cycleDay = getDaysDifference(cycleStartDate, dateStr) + 1;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if(cycleDay === 0) return; // Should not happen if phase exists
+            
             setModalDetail({
                 date: getFormattedDate(date),
-                day: day,
+                day: cycleDay,
                 phase: phase
             });
         }
@@ -452,9 +502,10 @@ const PhoebeCycleTracker: React.FC = () => {
             ))}
             {generateCalendarDays.map((date, i) => {
               const phase = getPhaseForDate(date);
-              const isToday = getFormattedDate(date) === todayStr;
+              const dateStr = getFormattedDate(date);
+              const isToday = dateStr === todayStr;
               const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-              const isPeriodStart = getFormattedDate(date) === lastStartDate;
+              const isPeriodStart = dateStr === lastStartDate;
 
               return (
                 <div 
@@ -462,7 +513,8 @@ const PhoebeCycleTracker: React.FC = () => {
                   onClick={() => handleDateClick(date)}
                   style={{ 
                     ...calendarDayStyle, 
-                    backgroundColor: isToday ? currentPhase.lightColor : (isPeriodStart ? `${phase?.color}30` : 'transparent'),
+                    // 如果有階段顏色，則使用該階段的淺色背景；如果是今天，使用當前階段的淺色背景
+                    backgroundColor: isToday ? currentPhase.lightColor : (phase ? `${phase.lightColor}80` : 'transparent'),
                     opacity: isCurrentMonth ? 1 : 0.4, 
                     border: isPeriodStart ? '2px solid #E95A85' : '1px solid #eee', 
                     cursor: phase ? 'pointer' : 'default',
@@ -520,7 +572,7 @@ const PhoebeCycleTracker: React.FC = () => {
             </div>
         </div>
         
-        {/* 4. 上次週期詳細紀錄 (新增區塊) */}
+        {/* 4. 上次週期詳細紀錄 (保留，提供症狀摘要) */}
         <div style={{...cardStyle, marginTop: '30px'}}>
             <h3 style={cardTitleStyle}>📖 上一次週期紀錄 (2025-11-05 ~ 2025-12-08)</h3>
             <div style={{ padding: '0 10px' }}>
