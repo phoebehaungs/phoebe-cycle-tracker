@@ -519,7 +519,7 @@ const PhoebeCycleTracker: React.FC = () => {
         {/* 1. 核心儀表板 - 圓餅圖進度條與狀態 */}
         <div style={{
             ...cardStyle,
-            backgroundColor: currentPhase.lightColor, 
+            backgroundColor: 'white', 
             padding: '30px 20px', 
             textAlign: 'center', 
             marginBottom: '20px',
@@ -1137,18 +1137,6 @@ const symptomRecordBoxStyle: React.CSSProperties = {
     marginTop: '20px',
     paddingTop: '10px',
     borderTop: '1px solid #f0f0f0',
-};
-
-const symptomButtonStyle: React.CSSProperties = {
-    border: '1px solid #ddd',
-    borderRadius: '15px',
-    padding: '5px 10px',
-    fontSize: '0.85rem',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    flexGrow: 1,
-    textAlign: 'center',
-    whiteSpace: 'nowrap',
 };
 
 export default PhoebeCycleTracker;
