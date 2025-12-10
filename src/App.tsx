@@ -1086,9 +1086,10 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '10px',
   borderRadius: '8px',
-  border: '1px solid '#ddd',
+  border: '1px solid #ddd',
   marginBottom: '10px',
 };
+
 
 const recordButtonStyle: React.CSSProperties = {
   width: '100%',
