@@ -29,6 +29,13 @@ interface DateDetail {
 
 // --- 2. Phoebe 的專屬設定資料 (Constants) ---
 
+// 初始數據：若 localStorage 沒有數據則使用這個
+const INITIAL_HISTORY: CycleRecord[] = [
+    { id: '1', startDate: '2025-11-05', length: 34 },
+    { id: '2', startDate: '2025-12-09', length: null },
+];
+const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
+
 // 新的配色方案：柔和、清新
 const PHASE_RULES: PhaseDefinition[] = [
   {
@@ -88,12 +95,6 @@ const PHASE_RULES: PhaseDefinition[] = [
   },
 ];
 
-// 初始數據：若 localStorage 沒有數據則使用這個
-const INITIAL_HISTORY: CycleRecord[] = [
-    { id: '1', startDate: '2025-11-05', length: 34 },
-    { id: '2', startDate: '2025-12-09', length: null },
-];
-const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 
 // --- 3. 輔助函數 (Helpers) ---
 
@@ -131,7 +132,7 @@ const endOfMonth = (date: Date): Date => {
 // --- 4. 主組件 (Main Component) ---
 
 const PhoebeCycleTracker: React.FC = () => {
-    // *** 修正點 1: 使用 localStorage 讀取數據，解決重新整理後數據回溯問題 ***
+    // 使用 localStorage 讀取數據
     const [history, setHistory] = useState<CycleRecord[]>(() => {
         const storedHistory = localStorage.getItem(LOCAL_STORAGE_KEY);
         try {
@@ -146,7 +147,6 @@ const PhoebeCycleTracker: React.FC = () => {
     useEffect(() => {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(history));
     }, [history]);
-    // -------------------------------------------------------------------------
 
     const [inputDate, setInputDate] = useState<string>(getFormattedDate(new Date()));
     const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -184,6 +184,11 @@ const PhoebeCycleTracker: React.FC = () => {
 
     const nextPeriodDate = addDays(lastStartDate, averageCycleLength);
     const nextPMSDate = addDays(nextPeriodDate, -7);
+
+    // 計算圓環進度
+    const progressPercent = useMemo(() => {
+        return Math.min(100, (daysPassed / averageCycleLength) * 100);
+    }, [daysPassed, averageCycleLength]);
 
     // --- 月曆相關邏輯 ---
 
@@ -317,40 +322,53 @@ const PhoebeCycleTracker: React.FC = () => {
           </p>
         </header>
 
-        {/* 1. 核心儀表板 - 狀態與修改按鈕 */}
+        {/* 1. 核心儀表板 - 圓餅圖進度條與狀態 */}
         <div style={{
             ...cardStyle,
-            backgroundColor: currentPhase.lightColor, // 淺色背景模擬
+            backgroundColor: currentPhase.lightColor, 
             padding: '30px 20px', 
             textAlign: 'center', 
             borderTop: `8px solid ${currentPhase.color}`,
             marginBottom: '20px',
         }}>
-          <div style={{ fontSize: '1.2rem', color: currentPhase.color }}>當前週期日</div>
-          <div style={{ fontSize: '5rem', fontWeight: 'bold', color: '#4a4a4a', lineHeight: 1 }}>
-            {daysPassed}
+          
+          <div style={circularChartContainerStyle}>
+             {/* 圓環進度條 (CSS 實現) */}
+            <div style={{
+                ...circularChartStyle,
+                background: `conic-gradient(${currentPhase.color} ${progressPercent}%, #f0f0f0 ${progressPercent}%)`,
+            }}>
+                <div style={circularChartInnerStyle}>
+                    <div style={{ fontSize: '1rem', color: '#666' }}>Cycle Day</div>
+                    <div style={{ fontSize: '3rem', fontWeight: 'bold', color: '#4a4a4a', lineHeight: 1 }}>
+                        {daysPassed}
+                    </div>
+                </div>
+            </div>
           </div>
-          <div style={{ 
-            display: 'inline-block', 
-            backgroundColor: currentPhase.color, 
-            color: 'white', 
-            padding: '8px 20px', 
-            borderRadius: '25px', 
-            marginTop: '15px',
-            fontWeight: 'bold',
-            fontSize: '1.1rem'
-          }}>
-            {currentPhase.name}
+          
+          <div style={{ marginTop: '20px' }}>
+              <div style={{ 
+                display: 'inline-block', 
+                backgroundColor: currentPhase.color, 
+                color: 'white', 
+                padding: '8px 20px', 
+                borderRadius: '25px', 
+                fontWeight: 'bold',
+                fontSize: '1.1rem'
+              }}>
+                {currentPhase.name}
+              </div>
+              <button 
+                  onClick={() => {
+                    setEditDate(lastStartDate); 
+                    setEditMode(true);
+                  }}
+                  style={editButtonStyle}
+              >
+                  修改本週期開始日
+              </button>
           </div>
-          <button 
-              onClick={() => {
-                setEditDate(lastStartDate); // 重設編輯欄位為當前開始日
-                setEditMode(true);
-              }}
-              style={editButtonStyle}
-          >
-              修改本週期開始日
-          </button>
         </div>
         
         {/* 2. 月曆區塊 */}
@@ -380,7 +398,7 @@ const PhoebeCycleTracker: React.FC = () => {
                   onClick={() => handleDateClick(date)}
                   style={{ 
                     ...calendarDayStyle, 
-                    backgroundColor: isToday ? '#ffe0b2' : (isPeriodStart ? `${phase?.color}30` : 'transparent'),
+                    backgroundColor: isToday ? currentPhase.lightColor : (isPeriodStart ? `${phase?.color}30` : 'transparent'),
                     opacity: isCurrentMonth ? 1 : 0.4, 
                     border: isPeriodStart ? '2px solid #E95A85' : '1px solid #eee', 
                     cursor: phase ? 'pointer' : 'default',
@@ -407,22 +425,22 @@ const PhoebeCycleTracker: React.FC = () => {
 
         {/* 3. 預測與紀錄區 (排版優化) */}
         <div style={gridContainerStyle}>
-            {/* 3A. 下次預測 (卡片) */}
+            {/* 3A. 下次預測 (卡片 - 優化排版) */}
             <div style={{...cardStyle, flex: 1, padding: '20px', borderTop: '4px solid #F49B00'}}>
               <h3 style={cardTitleStyle}>🔮 下次預測</h3>
-              <div style={predictionItemStyle}>
-                <span>下次 PMS 高峰 (黃體後期)：</span>
-                <strong style={{color: '#D1589F'}}>{nextPMSDate}</strong>
+              <div style={{ marginBottom: '15px' }}>
+                <div style={predictionLabelStyle}>下次 PMS 高峰 (黃體後期)：</div>
+                <strong style={{...predictionDateStyle, color: '#D1589F'}}>{nextPMSDate}</strong>
               </div>
-              <div style={predictionItemStyle}>
-                <span>下次生理期預計開始：</span>
-                <strong style={{color: '#E95A85'}}>{nextPeriodDate}</strong>
+              <div>
+                <div style={predictionLabelStyle}>下次生理期預計開始：</div>
+                <strong style={{...predictionDateStyle, color: '#E95A85'}}>{nextPeriodDate}</strong>
               </div>
             </div>
             
             {/* 3B. 週期紀錄 (卡片) */}
             <div style={{...cardStyle, flex: 1, padding: '20px', borderTop: '4px solid #4CB582'}}>
-              <h3 style={cardTitleStyle}>週期紀錄</h3>
+              <h3 style={cardTitleStyle}>紀錄新的開始日</h3>
               <input 
                 type="date" 
                 value={inputDate} 
@@ -433,7 +451,7 @@ const PhoebeCycleTracker: React.FC = () => {
                 onClick={handleNewPeriodRecord}
                 style={recordButtonStyle}
               >
-                紀錄新的開始日
+                確認並記錄週期
               </button>
             </div>
         </div>
@@ -614,7 +632,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const recordButtonStyle: React.CSSProperties = {
-    backgroundColor: '#4CB582', // 換成綠色
+    backgroundColor: '#4CB582', 
     color: 'white',
     border: 'none',
     padding: '10px 20px',
@@ -624,14 +642,50 @@ const recordButtonStyle: React.CSSProperties = {
     fontSize: '1rem'
 };
 
-const predictionItemStyle: React.CSSProperties = {
+// --- 新增/修改的排版樣式 ---
+const predictionLabelStyle: React.CSSProperties = {
+    fontSize: '0.9rem',
+    color: '#666',
+    marginBottom: '4px',
+    fontWeight: 'normal',
+};
+
+const predictionDateStyle: React.CSSProperties = {
+    fontSize: '1.4rem',
+    fontWeight: 'bold',
+    display: 'block',
+    lineHeight: '1.2',
+};
+
+// --- 圓餅圖樣式 (Circular Progress Chart) ---
+const circularChartContainerStyle: React.CSSProperties = {
     display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: '0.95rem',
-    marginBottom: '12px',
-    borderBottom: '1px dotted #eee',
-    paddingBottom: '5px'
-}
+    justifyContent: 'center',
+    marginBottom: '20px',
+};
+
+const circularChartStyle: React.CSSProperties = {
+    width: '120px',
+    height: '120px',
+    borderRadius: '50%',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+};
+
+const circularChartInnerStyle: React.CSSProperties = {
+    width: '100px',
+    height: '100px',
+    borderRadius: '50%',
+    backgroundColor: 'white',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    textAlign: 'center',
+};
+
 
 // --- Modal 樣式 ---
 const modalOverlayStyle: React.CSSProperties = {
@@ -669,7 +723,7 @@ const modalCloseButtonStyle: React.CSSProperties = {
 
 const modalSubtitleStyle: React.CSSProperties = {
     fontSize: '1rem',
-    color: '#D1589F', // PMS配色
+    color: '#D1589F', 
     marginTop: '15px',
     marginBottom: '5px',
 };
