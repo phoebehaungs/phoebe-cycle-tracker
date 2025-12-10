@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 
 // --- 1. 定義資料結構 (Type Definitions) ---
 
