@@ -1,5 +1,7 @@
-// 🌸 PMS 大作戰 - UI 基礎版（只有畫面骨架，之後再慢慢加功能）
+// 🌸 PMS 大作戰 - 加上「今日週期狀態」的實際計算版本
+// 重點：沒有 import React / FC / CSSProperties，避免之前的錯誤。
 
+// 顏色系統
 const palette = {
   bg: '#faf9f6',
   cardBg: '#ffffff',
@@ -10,6 +12,81 @@ const palette = {
   textSub: '#555',
   borderSoft: '#eee',
 };
+
+// 週期階段規則：用「週期第幾天」來判斷所屬階段
+const PHASE_RULES = [
+  {
+    name: '生理期',
+    startDay: 1,
+    endDay: 6,
+    description: '身體在代謝與修復的階段，通常會比較疲倦、想休息。',
+  },
+  {
+    name: '濾泡期（黃金期）',
+    startDay: 7,
+    endDay: 24,
+    description: '精力與情緒都比較穩定，也是最適合建立新習慣、看到成果的期間。',
+  },
+  {
+    name: '排卵期',
+    startDay: 25,
+    endDay: 27,
+    description: '荷爾蒙短暫高峰，可能感覺到體溫變化或輕微不適。',
+  },
+  {
+    name: '黃體期前段',
+    startDay: 28,
+    endDay: 29,
+    description: '開始比較容易累、情緒敏感，是 PMS 的前奏區。',
+  },
+  {
+    name: 'PMS 高峰',
+    startDay: 30,
+    endDay: 33,
+    description: '水腫、嘴饞、情緒起伏都可能變明顯，這是最辛苦但「可預期」的一段。',
+  },
+];
+
+// 簡化版週期紀錄（暫時寫死，之後可以再改成可編輯）
+const CYCLE_HISTORY = [
+  { id: '1', startDate: '2025-11-05' },
+  { id: '2', startDate: '2025-12-09' }, // 目前以這個當作最近一次生理期開始日
+];
+
+// ---- Helper functions ----
+
+// yyyy-mm-dd
+const formatDate = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const mm = m < 10 ? `0${m}` : `${m`;
+  const dd = d < 10 ? `0${d}` : `${d}`;
+  return `${y}-${mm}-${dd}`;
+};
+
+// 計算日期差（date2 - date1），單位：天
+const getDaysDifference = (date1: string, date2: string): number => {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  d1.setHours(0, 0, 0, 0);
+  d2.setHours(0, 0, 0, 0);
+  const diffMs = d2.getTime() - d1.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+};
+
+// 根據「週期第幾天」找到對應階段
+const getPhaseByCycleDay = (day: number) => {
+  if (day <= 0) return null;
+  const found = PHASE_RULES.find(
+    (p) => day >= p.startDay && day <= p.endDay
+  );
+  if (found) return found;
+  // 超過最後定義範圍，就暫時視為 PMS 之後延伸的尾聲
+  return PHASE_RULES[PHASE_RULES.length - 1];
+};
+
+// ---- Styles ----
 
 const appWrapperStyle = {
   minHeight: '100vh',
@@ -140,7 +217,39 @@ const sectionLabelStyle = {
   margin: '18px 2px 6px',
 } as const;
 
+// ---- App Component ----
+
 const App = () => {
+  // 1. 取得今天日期
+  const today = new Date();
+  const todayStr = formatDate(today);
+
+  // 2. 取得最近一次生理期開始日
+  const lastCycle = CYCLE_HISTORY[CYCLE_HISTORY.length - 1];
+  const lastStartDate = lastCycle.startDate;
+
+  // 3. 計算今天是週期第幾天（從 startDate 算起，第 1 天 = 生理期當天）
+  const diff = getDaysDifference(lastStartDate, todayStr);
+  const cycleDay = diff >= 0 ? diff + 1 : null; // 如果今天比開始日還早，就顯示 null
+
+  // 4. 根據 cycleDay 找到階段
+  const currentPhase = cycleDay ? getPhaseByCycleDay(cycleDay) : null;
+
+  // 5. Pill 上面要顯示的文字
+  let pillText = '尚未進入本次週期';
+  if (cycleDay && currentPhase) {
+    pillText = `目前階段：${currentPhase.name}`;
+  } else if (cycleDay && !currentPhase) {
+    pillText = '目前階段：尚未定義';
+  }
+
+  // 6. 描述區塊要顯示的文字
+  let phaseDescription =
+    '這裡之後會自動幫妳算出：「今天是本次週期第幾天、屬於哪一個階段」。';
+  if (cycleDay && currentPhase) {
+    phaseDescription = currentPhase.description;
+  }
+
   return (
     <div style={appWrapperStyle}>
       <main style={appInnerStyle}>
@@ -159,7 +268,7 @@ const App = () => {
         <div style={sectionLabelStyle}>今天</div>
 
         <section style={gridStyle}>
-          {/* 今日狀態卡 */}
+          {/* 今日狀態卡 —— 已接上真正的計算邏輯 */}
           <article
             style={{
               ...cardStyle,
@@ -168,13 +277,23 @@ const App = () => {
           >
             <div style={cardHeaderStyle}>
               <span style={cardTitleStyle}>今日週期狀態</span>
-              <span style={pillStyle}>之後會顯示：實際 Day & 階段</span>
+              <span style={pillStyle}>{pillText}</span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div>
                 <div style={mutedTextStyle}>週期日</div>
-                <div style={bigNumberStyle}>—</div>
+                <div style={bigNumberStyle}>{cycleDay ?? '—'}</div>
+                <div
+                  style={{
+                    ...mutedTextStyle,
+                    fontSize: '0.75rem',
+                    marginTop: '4px',
+                  }}
+                >
+                  以最近一次生理期開始日{' '}
+                  <strong>{lastStartDate}</strong> 為 Day 1。
+                </div>
               </div>
               <div
                 style={{
@@ -184,19 +303,18 @@ const App = () => {
                   lineHeight: 1.5,
                 }}
               >
-                這裡之後會自動幫妳算出：「今天是本次週期第幾天、屬於哪一個階段（生理期 /
-                濾泡期 / 排卵 / 黃體期 / PMS 高峰）」。
+                {phaseDescription}
               </div>
             </div>
 
             <div style={chipRowStyle}>
               <span style={{ ...chipStyle, backgroundColor: '#FFE7EE' }}>
-                🎯 之後會加：根據階段給當日關鍵提醒
+                🎯 下一步：根據階段顯示「當日照顧重點」
               </span>
             </div>
           </article>
 
-          {/* 今日照顧建議卡（未來用動態內容） */}
+          {/* 今日照顧建議卡（暫時仍為文字描述，之後可接動態內容） */}
           <article
             style={{
               ...cardStyle,
@@ -209,7 +327,7 @@ const App = () => {
             </div>
 
             <p style={mutedTextStyle}>
-              這裡未來會依照妳當天所在的週期階段，自動幫妳顯示：
+              未來這裡會依照妳當天所在的週期階段，自動幫妳顯示：
             </p>
             <ul
               style={{
@@ -225,7 +343,7 @@ const App = () => {
           </article>
         </section>
 
-        {/* Section：週期 / 歷史資料 */}
+        {/* Section：週期 / 歷史資料（仍為架構說明版） */}
         <div style={sectionLabelStyle}>週期 & 歷史</div>
 
         <section style={gridStyle}>
@@ -290,7 +408,8 @@ const App = () => {
         </section>
 
         <p style={footerHintStyle}>
-          現在是畫面架構版 ✅ 下一步，我們會開始把「真的運算邏輯」慢慢接上去。
+          現在是「已經有真實週期計算」的架構版 ✅
+          下一步，我們可以開始做：生理期紀錄編輯 / 每日紀錄表單。
         </p>
       </main>
     </div>
