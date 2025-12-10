@@ -216,7 +216,7 @@ const PhoebeCycleTracker: React.FC = () => {
   const [currentRecord, setCurrentRecord] = useState<SymptomRecord | null>(null);
 
   const [editMode, setEditMode] = useState(false);
-  const [editCycleLength, setEditCycleLength] = useState(34);
+  const [editCycleLength, setEditCycleLength] = useState(5); // 生理期天數
   const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
 
   // 取得現在週期
@@ -420,6 +420,14 @@ const PhoebeCycleTracker: React.FC = () => {
     });
   };
 
+  // 修改紀錄內容
+  const handleRecordChange = (field: keyof SymptomRecord, value: string) => {
+    setCurrentRecord((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [field]: value };
+    });
+  };
+
   // 儲存每日紀錄
   const handleSaveSymptomRecord = () => {
     if (!currentRecord) return;
@@ -456,7 +464,7 @@ const PhoebeCycleTracker: React.FC = () => {
 
   // 新增週期開始
   const handleNewPeriodRecord = () => {
-    if (!window.confirm(`確定要在 ${inputDate} 開始新的生理期嗎？`)) return;
+    if (!window.confirm(`確定要在 ${inputDate} 設定「這次生理期第一天」嗎？`)) return;
 
     const newStart = inputDate;
     const prevLength = getDaysDifference(lastStartDate, newStart);
@@ -478,7 +486,7 @@ const PhoebeCycleTracker: React.FC = () => {
     setCurrentMonth(new Date(newStart));
   };
 
-  // 儲存週期編輯
+  // 儲存週期編輯（這裡主要調整開始日期，生理期天數目前只是記錄給妳參考）
   const handleSaveEdit = () => {
     const updated = [...history];
 
@@ -495,6 +503,7 @@ const PhoebeCycleTracker: React.FC = () => {
     setHistory(updated);
     setCurrentMonth(new Date(editDate));
     setEditMode(false);
+    alert('本次週期的開始日期已更新。生理期天數記錄則可以未來拿來做統計、自己參考。');
   };
 
   // 改月曆月份
@@ -513,7 +522,8 @@ const PhoebeCycleTracker: React.FC = () => {
   useEffect(() => {
     if (editMode) {
       setEditDate(lastStartDate);
-      setEditCycleLength(averageCycleLength);
+      // 這裡可以先用平均週期長度／5 天預設
+      setEditCycleLength(5);
     }
   }, [editMode, lastStartDate, averageCycleLength]);
 
@@ -524,10 +534,9 @@ const PhoebeCycleTracker: React.FC = () => {
   return (
     <div style={appContainerStyle}>
       {/* Header */}
-<header style={headerStyle}>
-  <h1 style={headerTitleStyle}>PMS大作戰</h1>
-</header>
-
+      <header style={headerStyle}>
+        <h1 style={headerTitleStyle}>PMS大作戰</h1>
+      </header>
 
       {/* Dashboard */}
       <div
@@ -675,7 +684,7 @@ const PhoebeCycleTracker: React.FC = () => {
                   opacity: isCurrentMonth ? 1 : 0.6,
                   border: isPeriodStart
                     ? `2px solid ${phase?.accent || '#E95A85'}`
-                    : '1px solid #eee',
+                    : '1px solid '#eee',
                   cursor: phase ? 'pointer' : 'default',
                 }}
               >
@@ -740,31 +749,38 @@ const PhoebeCycleTracker: React.FC = () => {
           </div>
         </div>
 
-<div
-  style={{
-    ...cardStyle,
-    flex: 1,
-    padding: '20px',
-    borderTop: `4px solid ${PHASE_RULES[1].color}`,
-  }}
->
-  <h3 style={cardTitleStyle}>這次生理期第一天</h3>
+        <div
+          style={{
+            ...cardStyle,
+            flex: 1,
+            padding: '20px',
+            borderTop: `4px solid ${PHASE_RULES[1].color}`,
+          }}
+        >
+          <h3 style={cardTitleStyle}>這次生理期第一天</h3>
 
-  <p style={{ fontSize: '0.85rem', color: '#777', marginBottom: '8px' }}>
-    生理期來的當天，在這裡選日期按下「儲存」。
-    如果事後發現日期填錯，可以用上方的「修改本週期」調整。
-  </p>
+          <p
+            style={{
+              fontSize: '0.85rem',
+              color: '#777',
+              marginBottom: '8px',
+            }}
+          >
+            生理期來的當天，在這裡選日期按下「儲存」。
+            如果事後發現日期填錯，可以用上方的「修改本週期」調整。
+          </p>
 
-  <input
-    type="date"
-    value={inputDate}
-    onChange={(e) => setInputDate(e.target.value)}
-    style={inputStyle}
-  />
+          <input
+            type="date"
+            value={inputDate}
+            onChange={(e) => setInputDate(e.target.value)}
+            style={inputStyle}
+          />
 
-  <button onClick={handleNewPeriodRecord} style={recordButtonStyle}>
-    儲存這次的生理期第一天
-  </button>
+          <button onClick={handleNewPeriodRecord} style={recordButtonStyle}>
+            儲存這次的生理期第一天
+          </button>
+        </div>
       </div>
 
       {/* Phase Tips + 今日三件小事 */}
@@ -966,7 +982,11 @@ const PhoebeCycleTracker: React.FC = () => {
           <div style={modalContentStyle}>
             <h3 style={{ color: PHASE_RULES[3].accent }}>📅 修改本次週期</h3>
 
-            <label>新的開始日期：</label>
+            <p style={{ marginBottom: '8px' }}>
+              現在紀錄中的這次生理期第一天：<strong>{lastStartDate}</strong>
+            </p>
+
+            <label>新的生理期第一天：</label>
             <input
               type="date"
               value={editDate}
@@ -974,23 +994,28 @@ const PhoebeCycleTracker: React.FC = () => {
               style={inputStyle}
             />
 
-           <label style={{ marginTop: '15px' }}>
-  這次生理期天數（幾天）：
-</label>
-<input
-  type="number"
-  value={editCycleLength}
-  onChange={(e) =>
-    setEditCycleLength(parseInt(e.target.value) || 5)
-  }
-  min={1}
-  max={10}
-  style={inputStyle}
-/>
-<p style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>
-  （目前主要用來給妳參考，未來如果要做更細的圖表，可以再一起用到。）
-</p>
-
+            <label style={{ marginTop: '15px' }}>
+              這次生理期天數（幾天）：
+            </label>
+            <input
+              type="number"
+              value={editCycleLength}
+              onChange={(e) =>
+                setEditCycleLength(parseInt(e.target.value) || 5)
+              }
+              min={1}
+              max={10}
+              style={inputStyle}
+            />
+            <p
+              style={{
+                fontSize: '0.8rem',
+                color: '#888',
+                marginTop: '4px',
+              }}
+            >
+              目前主要是給妳自己參考的欄位，未來如果要做更細的圖表，可以再拿來一起用。
+            </p>
 
             <div
               style={{
@@ -1084,7 +1109,7 @@ const appContainerStyle: React.CSSProperties = {
 
 const headerStyle: React.CSSProperties = {
   display: 'flex',
-  justifyContent: 'space-between',
+  justifyContent: 'center',
   alignItems: 'center',
   padding: '15px 0',
   marginBottom: '10px',
@@ -1103,6 +1128,7 @@ const editButtonInlineStyle: React.CSSProperties = {
   color: PHASE_RULES[3].accent,
   fontWeight: 'bold',
   cursor: 'pointer',
+  marginLeft: 'auto',
 };
 
 const todayStatusContainerStyle: React.CSSProperties = {
