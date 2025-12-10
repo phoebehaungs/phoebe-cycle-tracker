@@ -10,12 +10,20 @@ interface PhaseDefinition {
   care: string[];
   diet: string[];
   color: string;
+  hormone: string; // 新增賀爾蒙週期
 }
 
 interface CycleRecord {
   id: string;
-  startDate: string; // 格式 YYYY-MM-DD
+  startDate: string;
   length: number | null;
+}
+
+// 彈窗顯示的日期資訊
+interface DateDetail {
+    date: string;
+    day: number;
+    phase: PhaseDefinition;
 }
 
 // --- 2. Phoebe 的專屬設定資料 (Constants) ---
@@ -28,7 +36,8 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['疲倦', '想休息', '子宮悶感'],
     diet: ['食慾低～中', '想吃冰', '多補充蛋白質'],
     care: ['不逼自己運動', '多喝紅棗黑豆枸杞茶', '早餐多蛋白質'],
-    color: '#ef4444', // Red
+    color: '#ef4444', 
+    hormone: '雌激素與黃體素低點',
   },
   {
     name: '濾泡期 (黃金期)',
@@ -37,7 +46,8 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['精力恢復', '心情穩定', '身體輕盈'],
     diet: ['食慾最低', '最好控制', '飽足感良好'],
     care: ['適合減脂', '建立新習慣', 'Zumba / 伸展'],
-    color: '#10b981', // Green
+    color: '#10b981', 
+    hormone: '雌激素逐漸上升',
   },
   {
     name: '排卵期',
@@ -46,7 +56,8 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['微水腫', '下腹不適', '體溫升高'],
     diet: ['食慾微增', '有些人想吃甜'],
     care: ['多喝水', '多吃蔬菜', '補充可溶性纖維(地瓜)'],
-    color: '#f59e0b', // Amber
+    color: '#f59e0b', 
+    hormone: '黃體生成素(LH)高峰',
   },
   {
     name: '黃體期前段',
@@ -55,7 +66,8 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['情緒敏感', '容易累'],
     diet: ['開始嘴饞', '想吃頻率變高'],
     care: ['提前保護血糖', '下午準備安全點心', '每餐加纖維'],
-    color: '#8b5cf6', // Violet
+    color: '#8b5cf6', 
+    hormone: '黃體素開始上升',
   },
   {
     name: 'PMS 高峰',
@@ -64,11 +76,12 @@ const PHASE_RULES: PhaseDefinition[] = [
     symptoms: ['焦慮', '睡不好', '水腫', '罪惡感', '子宮收縮'],
     diet: ['想吃甜/冰', '正餐後還想吃', '食慾高峰'],
     care: ['補充鎂', '低負擔運動(伸展)', '允許自己多吃 5-10%', '深呼吸'],
-    color: '#ec4899', // Pink
+    color: '#ec4899', 
+    hormone: '黃體素高峰 / 準備下降',
   },
 ];
 
-// --- 3. 輔助函數 (Helpers - 必須在組件外部定義) ---
+// --- 3. 輔助函數 (Helpers) ---
 
 const getFormattedDate = (date: Date): string => {
   const y = date.getFullYear();
@@ -80,7 +93,6 @@ const getFormattedDate = (date: Date): string => {
 const getDaysDifference = (date1: string, date2: string): number => {
   const d1 = new Date(date1);
   const d2 = new Date(date2);
-  // 重置時間以避免時區影響計算天數
   d1.setHours(0, 0, 0, 0);
   d2.setHours(0, 0, 0, 0);
   const diffTime = d2.getTime() - d1.getTime(); 
@@ -105,7 +117,6 @@ const endOfMonth = (date: Date): Date => {
 // --- 4. 主組件 (Main Component) ---
 
 const PhoebeCycleTracker: React.FC = () => {
-  // 初始狀態：模擬 Phoebe 的歷史資料
   const [history, setHistory] = useState<CycleRecord[]>([
     { id: '1', startDate: '2025-11-05', length: 34 },
     { id: '2', startDate: '2025-12-09', length: null },
@@ -113,17 +124,23 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const [inputDate, setInputDate] = useState<string>(getFormattedDate(new Date()));
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  // 彈窗狀態：用來儲存要顯示的日期詳情，null 表示關閉
+  const [modalDetail, setModalDetail] = useState<DateDetail | null>(null); 
+  
+  // 週期修改狀態
+  const [editMode, setEditMode] = useState(false);
+  const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
 
   // --- 計算邏輯 ---
 
   const currentCycle = history[history.length - 1];
   const lastStartDate = currentCycle.startDate;
-
   const todayStr = getFormattedDate(new Date());
   
   const daysPassed = useMemo(() => {
     const diff = getDaysDifference(lastStartDate, todayStr);
-    return diff + 1; // Day 1 = 0 差值 + 1
+    return diff + 1;
   }, [lastStartDate, todayStr]);
 
   const averageCycleLength = useMemo(() => {
@@ -149,7 +166,6 @@ const PhoebeCycleTracker: React.FC = () => {
     const dateStr = getFormattedDate(date);
     const diffDays = getDaysDifference(lastStartDate, dateStr) + 1;
 
-    // 排除當前週期開始前的日期
     if (date < new Date(lastStartDate)) return undefined; 
 
     return PHASE_RULES.find(
@@ -164,25 +180,21 @@ const PhoebeCycleTracker: React.FC = () => {
     const days: Date[] = [];
 
     const firstDayOfWeek = startDay.getDay(); 
-    // 填補月初的空白
     for (let i = 0; i < firstDayOfWeek; i++) {
       const prevMonthDay = new Date(startDay);
       prevMonthDay.setDate(startDay.getDate() - (firstDayOfWeek - i));
       days.push(prevMonthDay);
     }
 
-    // 填入當月日期
     for (let d = new Date(startDay); d <= endDay; d.setDate(d.getDate() + 1)) {
       days.push(new Date(d));
     }
 
-    // 填補月末的空白
     const totalDays = days.length;
     const slotsToFill = (Math.ceil(totalDays / 7) * 7) - totalDays;
     
     for (let i = 1; i <= slotsToFill; i++) {
       const nextMonthDay = new Date(endDay);
-      // *** 修正點 ***：使用 endDay.getDate() 而非錯誤的 endMonth
       nextMonthDay.setDate(endDay.getDate() + i); 
       days.push(nextMonthDay);
     }
@@ -199,7 +211,6 @@ const PhoebeCycleTracker: React.FC = () => {
     const newStartDate = inputDate;
     const prevCycleLength = getDaysDifference(lastStartDate, newStartDate); 
     
-    // 檢查週期長度是否合理
     if (prevCycleLength <= 0) {
         alert("錯誤：新的開始日期不能早於或等於上一次開始日期！");
         return;
@@ -214,9 +225,41 @@ const PhoebeCycleTracker: React.FC = () => {
     });
 
     setHistory(updatedHistory);
-    // 更新月曆到新週期開始的月份
     setCurrentMonth(new Date(newStartDate));
     alert(`已記錄！上個週期長度為 ${prevCycleLength} 天，平均值已自動修正。`);
+  };
+
+  const handleDateClick = (date: Date) => {
+      const phase = getPhaseForDate(date);
+      if (phase) {
+          const day = getDaysDifference(lastStartDate, getFormattedDate(date)) + 1;
+          setModalDetail({
+              date: getFormattedDate(date),
+              day: day,
+              phase: phase
+          });
+      }
+  };
+
+  const handleSaveEdit = () => {
+    const oldStartDate = lastStartDate;
+    if (editDate === oldStartDate) {
+        setEditMode(false);
+        return;
+    }
+
+    if (!window.confirm(`確定要將本次週期開始日期從 ${oldStartDate} 修改為 ${editDate} 嗎？`)) {
+        return;
+    }
+
+    const updatedHistory = [...history];
+    // 只修改當前週期的開始日期
+    updatedHistory[updatedHistory.length - 1].startDate = editDate;
+    
+    setHistory(updatedHistory);
+    setCurrentMonth(new Date(editDate));
+    setEditMode(false);
+    alert(`本次週期開始日期已成功修改為 ${editDate}。`);
   };
 
   const goToPreviousMonth = () => {
@@ -275,10 +318,69 @@ const PhoebeCycleTracker: React.FC = () => {
         }}>
           {currentPhase.name}
         </div>
+        <button 
+            onClick={() => setEditMode(true)}
+            style={editButtonStyle}
+        >
+            修改本週期開始日
+        </button>
+      </div>
+      
+      {/* 2. 月曆區塊 (前移到第二區塊) */}
+      <div style={{ ...cardStyle, marginTop: '30px' }}>
+        <h3 style={cardTitleStyle}>🗓️ 週期月曆</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+          <button onClick={goToPreviousMonth} style={calendarNavButtonStyle}>&lt;</button>
+          <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+            {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
+          </span>
+          <button onClick={goToNextMonth} style={calendarNavButtonStyle}>&gt;</button>
+        </div>
+        
+        {/* 月曆網格容器 */}
+        <div style={calendarGridStyle}>
+          {dayNames.map((name, i) => (
+            <div key={i} style={dayNameStyle}>{name}</div>
+          ))}
+          {generateCalendarDays.map((date, i) => {
+            const phase = getPhaseForDate(date);
+            const isToday = getFormattedDate(date) === todayStr;
+            const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
+            const isPeriodStart = getFormattedDate(date) === lastStartDate;
+
+            return (
+              <div 
+                key={i} 
+                onClick={() => handleDateClick(date)}
+                style={{ 
+                  ...calendarDayStyle, 
+                  backgroundColor: isToday ? '#ffe0b2' : 'transparent', 
+                  opacity: isCurrentMonth ? 1 : 0.4, 
+                  border: isPeriodStart ? '2px solid #ef4444' : '1px solid #eee', 
+                  cursor: phase ? 'pointer' : 'default', // 有資料才可點擊
+                }}
+              >
+                <div style={{ fontSize: '0.9rem', marginBottom: '5px' }}>{date.getDate()}</div>
+                {phase && (
+                  <div 
+                    title={phase.name}
+                    style={{ 
+                      backgroundColor: phase.color, 
+                      height: '5px', 
+                      borderRadius: '2px', 
+                      width: '80%',
+                      margin: '0 auto' 
+                    }}
+                  ></div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* 建議卡片 */}
-      <div style={{ display: 'grid', gap: '15px' }}>
+      {/* 建議卡片 (移到月曆之後) */}
+      <div style={{ display: 'grid', gap: '15px', marginTop: '30px' }}>
         
         {/* 症狀區 */}
         <div style={cardStyle}>
@@ -307,57 +409,6 @@ const PhoebeCycleTracker: React.FC = () => {
               </li>
             ))}
           </ul>
-        </div>
-      </div>
-
-      {/* 月曆區塊 */}
-      <div style={{ ...cardStyle, marginTop: '30px' }}>
-        <h3 style={cardTitleStyle}>🗓️ 週期月曆</h3>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-          <button onClick={goToPreviousMonth} style={calendarNavButtonStyle}>&lt;</button>
-          <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-            {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
-          </span>
-          <button onClick={goToNextMonth} style={calendarNavButtonStyle}>&gt;</button>
-        </div>
-        
-        {/* 月曆網格容器 */}
-        <div style={calendarGridStyle}>
-          {dayNames.map((name, i) => (
-            <div key={i} style={dayNameStyle}>{name}</div>
-          ))}
-          {generateCalendarDays.map((date, i) => {
-            const phase = getPhaseForDate(date);
-            const isToday = getFormattedDate(date) === todayStr;
-            const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-            const isPeriodStart = getFormattedDate(date) === lastStartDate;
-
-            return (
-              <div 
-                key={i} 
-                style={{ 
-                  ...calendarDayStyle, 
-                  backgroundColor: isToday ? '#ffe0b2' : 'transparent', 
-                  opacity: isCurrentMonth ? 1 : 0.4, 
-                  border: isPeriodStart ? '2px solid #ef4444' : '1px solid #eee', 
-                }}
-              >
-                <div style={{ fontSize: '0.9rem', marginBottom: '5px' }}>{date.getDate()}</div>
-                {phase && (
-                  <div 
-                    title={phase.name}
-                    style={{ 
-                      backgroundColor: phase.color, 
-                      height: '5px', 
-                      borderRadius: '2px', 
-                      width: '80%',
-                      margin: '0 auto' 
-                    }}
-                  ></div>
-                )}
-              </div>
-            );
-          })}
         </div>
       </div>
 
@@ -398,10 +449,50 @@ const PhoebeCycleTracker: React.FC = () => {
             紀錄
           </button>
         </div>
-        <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '5px' }}>
-          輸入後，系統將自動校正平均週期長度。
-        </p>
       </div>
+
+    {/* 3. 彈窗模組：日期詳情 */}
+    {modalDetail && (
+        <div style={modalOverlayStyle}>
+            <div style={modalContentStyle}>
+                <h3 style={{ color: modalDetail.phase.color }}>{modalDetail.date} 詳情</h3>
+                <p>週期日: <strong>Day {modalDetail.day}</strong></p>
+                <p>階段: <strong style={{color: modalDetail.phase.color}}>{modalDetail.phase.name}</strong></p>
+                <p>賀爾蒙週期: <strong>{modalDetail.phase.hormone}</strong></p>
+                
+                <h4 style={modalSubtitleStyle}>預期症狀:</h4>
+                <ul style={modalListStyle}>
+                    {modalDetail.phase.symptoms.map((s, i) => <li key={i}>{s}</li>)}
+                    {modalDetail.phase.diet.map((s, i) => <li key={i}>{s}</li>)}
+                </ul>
+
+                <button onClick={() => setModalDetail(null)} style={modalCloseButtonStyle}>關閉</button>
+            </div>
+        </div>
+    )}
+
+    {/* 4. 彈窗模組：修改本週期開始日 */}
+    {editMode && (
+        <div style={modalOverlayStyle}>
+            <div style={modalContentStyle}>
+                <h3 style={{ color: '#d4a5a5' }}>📅 修改本次週期開始日</h3>
+                <p>當前開始日：<strong>{lastStartDate}</strong></p>
+                
+                <label style={{ display: 'block', margin: '15px 0 5px' }}>選擇新的開始日期:</label>
+                <input 
+                    type="date" 
+                    value={editDate} 
+                    onChange={(e) => setEditDate(e.target.value)}
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc' }}
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
+                    <button onClick={() => setEditMode(false)} style={{ ...modalCloseButtonStyle, backgroundColor: '#ccc', width: '48%' }}>取消</button>
+                    <button onClick={handleSaveEdit} style={{ ...modalCloseButtonStyle, width: '48%' }}>儲存修改</button>
+                </div>
+            </div>
+        </div>
+    )}
 
     </div>
   );
@@ -451,13 +542,6 @@ const calendarGridStyle: React.CSSProperties = {
   textAlign: 'center',
 };
 
-const dayNameStyle: React.CSSProperties = {
-  fontWeight: 'bold',
-  color: '#777',
-  padding: '8px 0',
-  fontSize: '0.85rem',
-};
-
 const calendarDayStyle: React.CSSProperties = {
   padding: '8px 0',
   borderRadius: '8px',
@@ -468,6 +552,75 @@ const calendarDayStyle: React.CSSProperties = {
   alignItems: 'center',
   position: 'relative',
   border: '1px solid #eee',
+  transition: 'transform 0.1s',
+};
+
+const dayNameStyle: React.CSSProperties = {
+  fontWeight: 'bold',
+  color: '#777',
+  padding: '8px 0',
+  fontSize: '0.85rem',
+};
+
+const editButtonStyle: React.CSSProperties = {
+    backgroundColor: '#d4a5a5',
+    color: 'white',
+    border: 'none',
+    padding: '8px 15px',
+    borderRadius: '15px',
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+    marginTop: '15px',
+    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+};
+
+// --- Modal 樣式 ---
+const modalOverlayStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+};
+
+const modalContentStyle: React.CSSProperties = {
+    backgroundColor: 'white',
+    padding: '30px',
+    borderRadius: '15px',
+    maxWidth: '90%',
+    width: '350px',
+    boxShadow: '0 5px 20px rgba(0, 0, 0, 0.2)',
+};
+
+const modalCloseButtonStyle: React.CSSProperties = {
+    backgroundColor: '#4a4a4a',
+    color: 'white',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    marginTop: '20px',
+    width: '100%'
+};
+
+const modalSubtitleStyle: React.CSSProperties = {
+    fontSize: '1rem',
+    color: '#d4a5a5',
+    marginTop: '15px',
+    marginBottom: '5px',
+};
+
+const modalListStyle: React.CSSProperties = {
+    margin: 0,
+    paddingLeft: '20px',
+    fontSize: '0.9rem',
+    color: '#666',
+    lineHeight: '1.4',
 };
 
 export default PhoebeCycleTracker;
