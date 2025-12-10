@@ -125,10 +125,8 @@ const PhoebeCycleTracker: React.FC = () => {
   const [inputDate, setInputDate] = useState<string>(getFormattedDate(new Date()));
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
-  // 彈窗狀態：用來儲存要顯示的日期詳情，null 表示關閉
   const [modalDetail, setModalDetail] = useState<DateDetail | null>(null); 
   
-  // 週期修改狀態
   const [editMode, setEditMode] = useState(false);
   const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
 
@@ -136,6 +134,7 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const currentCycle = history[history.length - 1];
   const lastStartDate = currentCycle.startDate;
+
   const todayStr = getFormattedDate(new Date());
   
   const daysPassed = useMemo(() => {
@@ -253,7 +252,6 @@ const PhoebeCycleTracker: React.FC = () => {
     }
 
     const updatedHistory = [...history];
-    // 只修改當前週期的開始日期
     updatedHistory[updatedHistory.length - 1].startDate = editDate;
     
     setHistory(updatedHistory);
@@ -283,38 +281,38 @@ const PhoebeCycleTracker: React.FC = () => {
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
   return (
-    <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#faf9f6', minHeight: '100vh' }}>
+    <div style={appContainerStyle}>
       
       {/* 標題區 */}
       <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: '#4a4a4a', fontSize: '1.5rem', marginBottom: '5px' }}>Phoebe 週期追蹤</h1>
-        <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>
+        <h1 style={{ color: '#4a4a4a', fontSize: '1.8rem', marginBottom: '5px' }}>Phoebe 週期追蹤</h1>
+        <p style={{ color: '#888', fontSize: '1rem', margin: 0 }}>
           平均週期: <strong>{averageCycleLength}</strong> 天
         </p>
       </header>
 
-      {/* 核心儀表板 */}
-      <div style={{ 
-        backgroundColor: 'white', 
-        borderRadius: '20px', 
-        padding: '30px 20px', 
-        textAlign: 'center', 
-        boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-        marginBottom: '20px',
-        borderTop: `6px solid ${currentPhase.color}`
+      {/* 1. 核心儀表板 - 參考圖上的大卡片風格 */}
+      <div style={{
+          ...cardStyle,
+          backgroundColor: '#ffe0b2', // 淺色背景模擬
+          padding: '30px 20px', 
+          textAlign: 'center', 
+          borderTop: `8px solid ${currentPhase.color}`,
+          marginBottom: '20px',
       }}>
-        <div style={{ fontSize: '1rem', color: '#888' }}>Cycle Day</div>
-        <div style={{ fontSize: '4rem', fontWeight: 'bold', color: '#4a4a4a', lineHeight: 1 }}>
+        <div style={{ fontSize: '1.2rem', color: '#666' }}>當前週期日</div>
+        <div style={{ fontSize: '5rem', fontWeight: 'bold', color: '#4a4a4a', lineHeight: 1 }}>
           {daysPassed}
         </div>
         <div style={{ 
           display: 'inline-block', 
           backgroundColor: `${currentPhase.color}20`, 
           color: currentPhase.color, 
-          padding: '6px 15px', 
-          borderRadius: '20px', 
+          padding: '8px 20px', 
+          borderRadius: '25px', 
           marginTop: '15px',
-          fontWeight: 'bold'
+          fontWeight: 'bold',
+          fontSize: '1.1rem'
         }}>
           {currentPhase.name}
         </div>
@@ -326,8 +324,8 @@ const PhoebeCycleTracker: React.FC = () => {
         </button>
       </div>
       
-      {/* 2. 月曆區塊 (前移到第二區塊) */}
-      <div style={{ ...cardStyle, marginTop: '30px' }}>
+      {/* 2. 月曆區塊 (移到第二區塊) */}
+      <div style={{ ...cardStyle, marginTop: '20px' }}>
         <h3 style={cardTitleStyle}>🗓️ 週期月曆</h3>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <button onClick={goToPreviousMonth} style={calendarNavButtonStyle}>&lt;</button>
@@ -337,7 +335,6 @@ const PhoebeCycleTracker: React.FC = () => {
           <button onClick={goToNextMonth} style={calendarNavButtonStyle}>&gt;</button>
         </div>
         
-        {/* 月曆網格容器 */}
         <div style={calendarGridStyle}>
           {dayNames.map((name, i) => (
             <div key={i} style={dayNameStyle}>{name}</div>
@@ -354,10 +351,10 @@ const PhoebeCycleTracker: React.FC = () => {
                 onClick={() => handleDateClick(date)}
                 style={{ 
                   ...calendarDayStyle, 
-                  backgroundColor: isToday ? '#ffe0b2' : 'transparent', 
+                  backgroundColor: isToday ? '#ffe0b2' : (isPeriodStart ? `${currentPhase.color}30` : 'transparent'), // 今日/經期開始標記
                   opacity: isCurrentMonth ? 1 : 0.4, 
                   border: isPeriodStart ? '2px solid #ef4444' : '1px solid #eee', 
-                  cursor: phase ? 'pointer' : 'default', // 有資料才可點擊
+                  cursor: phase ? 'pointer' : 'default',
                 }}
               >
                 <div style={{ fontSize: '0.9rem', marginBottom: '5px' }}>{date.getDate()}</div>
@@ -379,22 +376,47 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* 建議卡片 (移到月曆之後) */}
+      {/* 3. 預測與建議區 (並排顯示) */}
+      <div style={gridContainerStyle}>
+          {/* 預測區 (卡片化) */}
+          <div style={{...cardStyle, flex: 1, padding: '20px'}}>
+            <h3 style={cardTitleStyle}>🔮 下次預測</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', marginBottom: '10px' }}>
+              <span>下次 PMS：</span>
+              <strong>{nextPMSDate}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}>
+              <span>下次生理期：</span>
+              <strong style={{color: '#ef4444'}}>{nextPeriodDate}</strong>
+            </div>
+          </div>
+          
+          {/* 輸入新週期 (卡片化) */}
+          <div style={{...cardStyle, flex: 1, padding: '20px'}}>
+            <h3 style={cardTitleStyle}>週期紀錄</h3>
+            <input 
+              type="date" 
+              value={inputDate} 
+              onChange={(e) => setInputDate(e.target.value)}
+              style={inputStyle}
+            />
+            <button 
+              onClick={handleNewPeriodRecord}
+              style={recordButtonStyle}
+            >
+              紀錄新的開始日
+            </button>
+          </div>
+      </div>
+      
+      {/* 4. 建議卡片 */}
       <div style={{ display: 'grid', gap: '15px', marginTop: '30px' }}>
         
         {/* 症狀區 */}
         <div style={cardStyle}>
-          <h3 style={cardTitleStyle}>🌡️ 身體症狀</h3>
+          <h3 style={cardTitleStyle}>🌡️ 當前症狀總結</h3>
           <ul style={listStyle}>
             {currentPhase.symptoms.map((s, i) => <li key={i}>{s}</li>)}
-          </ul>
-        </div>
-
-        {/* 食慾與飲食 */}
-        <div style={cardStyle}>
-          <h3 style={cardTitleStyle}>🥗 食慾與對策</h3>
-          <ul style={listStyle}>
-            {currentPhase.diet.map((s, i) => <li key={i}>{s}</li>)}
           </ul>
         </div>
 
@@ -412,58 +434,19 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* 預測區 */}
-      <div style={{ marginTop: '30px', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '12px' }}>
-        <h3 style={{ fontSize: '1rem', margin: '0 0 10px 0', color: '#555' }}>📅 未來預測</h3>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-          <span>下次 PMS 開始：</span>
-          <strong>{nextPMSDate}</strong>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: '5px' }}>
-          <span>下次生理期：</span>
-          <strong>{nextPeriodDate}</strong>
-        </div>
-      </div>
 
-      {/* 輸入新週期 */}
-      <div style={{ marginTop: '30px', borderTop: '1px solid #ddd', paddingTop: '20px' }}>
-        <h3 style={{ fontSize: '1rem', marginBottom: '10px' }}>生理期來了嗎？</h3>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <input 
-            type="date" 
-            value={inputDate} 
-            onChange={(e) => setInputDate(e.target.value)}
-            style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ccc' }}
-          />
-          <button 
-            onClick={handleNewPeriodRecord}
-            style={{ 
-              backgroundColor: '#4a4a4a', 
-              color: 'white', 
-              border: 'none', 
-              padding: '0 20px', 
-              borderRadius: '8px',
-              cursor: 'pointer'
-            }}
-          >
-            紀錄
-          </button>
-        </div>
-      </div>
-
-    {/* 3. 彈窗模組：日期詳情 */}
+    {/* 彈窗模組：日期詳情 */}
     {modalDetail && (
         <div style={modalOverlayStyle}>
             <div style={modalContentStyle}>
                 <h3 style={{ color: modalDetail.phase.color }}>{modalDetail.date} 詳情</h3>
-                <p>週期日: <strong>Day {modalDetail.day}</strong></p>
-                <p>階段: <strong style={{color: modalDetail.phase.color}}>{modalDetail.phase.name}</strong></p>
-                <p>賀爾蒙週期: <strong>{modalDetail.phase.hormone}</strong></p>
+                <p style={modalTextStyle}>週期日: <strong>Day {modalDetail.day}</strong></p>
+                <p style={modalTextStyle}>階段: <strong style={{color: modalDetail.phase.color}}>{modalDetail.phase.name}</strong></p>
+                <p style={modalTextStyle}>賀爾蒙週期: <strong>{modalDetail.phase.hormone}</strong></p>
                 
-                <h4 style={modalSubtitleStyle}>預期症狀:</h4>
+                <h4 style={modalSubtitleStyle}>預期症狀/食慾:</h4>
                 <ul style={modalListStyle}>
-                    {modalDetail.phase.symptoms.map((s, i) => <li key={i}>{s}</li>)}
-                    {modalDetail.phase.diet.map((s, i) => <li key={i}>{s}</li>)}
+                    {[...modalDetail.phase.symptoms, ...modalDetail.phase.diet].map((s, i) => <li key={i}>{s}</li>)}
                 </ul>
 
                 <button onClick={() => setModalDetail(null)} style={modalCloseButtonStyle}>關閉</button>
@@ -471,24 +454,24 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
     )}
 
-    {/* 4. 彈窗模組：修改本週期開始日 */}
+    {/* 彈窗模組：修改本週期開始日 */}
     {editMode && (
         <div style={modalOverlayStyle}>
             <div style={modalContentStyle}>
                 <h3 style={{ color: '#d4a5a5' }}>📅 修改本次週期開始日</h3>
-                <p>當前開始日：<strong>{lastStartDate}</strong></p>
+                <p style={{marginBottom: '15px'}}>當前開始日：<strong>{lastStartDate}</strong></p>
                 
-                <label style={{ display: 'block', margin: '15px 0 5px' }}>選擇新的開始日期:</label>
+                <label style={{ display: 'block', margin: '5px 0' }}>選擇新的開始日期:</label>
                 <input 
                     type="date" 
                     value={editDate} 
                     onChange={(e) => setEditDate(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc' }}
+                    style={inputStyle}
                 />
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                    <button onClick={() => setEditMode(false)} style={{ ...modalCloseButtonStyle, backgroundColor: '#ccc', width: '48%' }}>取消</button>
-                    <button onClick={handleSaveEdit} style={{ ...modalCloseButtonStyle, width: '48%' }}>儲存修改</button>
+                    <button onClick={() => setEditMode(false)} style={{ ...modalCloseButtonStyle, backgroundColor: '#ccc', width: '48%', marginTop: 0 }}>取消</button>
+                    <button onClick={handleSaveEdit} style={{ ...modalCloseButtonStyle, width: '48%', marginTop: 0 }}>儲存修改</button>
                 </div>
             </div>
         </div>
@@ -498,17 +481,27 @@ const PhoebeCycleTracker: React.FC = () => {
   );
 };
 
-// --- Styles (必須在組件外部定義) ---
+// --- Styles (CSS-in-JS for simplicity) ---
+
+// --- 調整主容器寬度 ---
+const appContainerStyle: React.CSSProperties = {
+    maxWidth: '600px', // 拓寬主容器
+    margin: '0 auto',
+    padding: '20px',
+    fontFamily: 'sans-serif',
+    backgroundColor: '#faf9f6',
+    minHeight: '100vh'
+};
 
 const cardStyle: React.CSSProperties = {
   backgroundColor: 'white',
   padding: '15px',
-  borderRadius: '12px',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+  borderRadius: '16px', // 微調圓角
+  boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
 };
 
 const cardTitleStyle: React.CSSProperties = {
-  fontSize: '1rem',
+  fontSize: '1.1rem',
   margin: '0 0 10px 0',
   color: '#444',
   borderBottom: '2px solid #f0f0f0',
@@ -518,9 +511,9 @@ const cardTitleStyle: React.CSSProperties = {
 const listStyle: React.CSSProperties = {
   margin: 0,
   paddingLeft: '20px',
-  fontSize: '0.95rem',
+  fontSize: '1rem',
   color: '#555',
-  lineHeight: '1.6'
+  lineHeight: '1.7'
 };
 
 const calendarNavButtonStyle: React.CSSProperties = {
@@ -537,7 +530,7 @@ const calendarGridStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(7, 1fr)',
   margin: '0 auto', 
-  maxWidth: '450px',
+  maxWidth: '560px', // 配合拓寬的主容器
   gap: '5px',
   textAlign: 'center',
 };
@@ -559,11 +552,11 @@ const dayNameStyle: React.CSSProperties = {
   fontWeight: 'bold',
   color: '#777',
   padding: '8px 0',
-  fontSize: '0.85rem',
+  fontSize: '0.9rem',
 };
 
 const editButtonStyle: React.CSSProperties = {
-    backgroundColor: '#d4a5a5',
+    backgroundColor: '#8b5cf6', // 稍微換個顏色區分主要按鈕
     color: 'white',
     border: 'none',
     padding: '8px 15px',
@@ -571,8 +564,38 @@ const editButtonStyle: React.CSSProperties = {
     fontSize: '0.85rem',
     cursor: 'pointer',
     marginTop: '15px',
+    marginLeft: '10px',
     boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
 };
+
+const gridContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '20px',
+    marginTop: '30px',
+    flexWrap: 'wrap', // 讓它在窄螢幕上可以換行
+};
+
+const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '10px',
+    marginBottom: '10px',
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+    boxSizing: 'border-box',
+    fontSize: '1rem'
+};
+
+const recordButtonStyle: React.CSSProperties = {
+    backgroundColor: '#ef4444',
+    color: 'white',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    width: '100%',
+    fontSize: '1rem'
+};
+
 
 // --- Modal 樣式 ---
 const modalOverlayStyle: React.CSSProperties = {
@@ -621,6 +644,11 @@ const modalListStyle: React.CSSProperties = {
     fontSize: '0.9rem',
     color: '#666',
     lineHeight: '1.4',
+};
+
+const modalTextStyle: React.CSSProperties = {
+    fontSize: '1rem',
+    marginBottom: '8px'
 };
 
 export default PhoebeCycleTracker;
