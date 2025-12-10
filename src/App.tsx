@@ -9,7 +9,6 @@ interface PhaseDefinition {
   symptoms: string[];
   care: string[];
   diet: string[];
-  tips: string; // 新增：溫馨小提醒
   color: string;
   hormone: string; 
   lightColor: string;
@@ -64,7 +63,7 @@ const PHASE_RULES: PhaseDefinition[] = [
         '早餐多一點蛋白質（減少下午嘴饞）'
     ],
     tips: '這段是妳最「穩定」的時候，適合讓身體慢慢調整。',
-    color: '#FF6F91', // 紅色/桃粉
+    color: '#E95A85', // 柔和紅/桃粉
     lightColor: '#FFE7EE', 
     hormone: '雌激素與黃體素低點',
     accent: '#D63A7F',
@@ -513,18 +512,20 @@ const PhoebeCycleTracker: React.FC = () => {
         {/* 標題區 (頂部導航欄) */}
         <header style={headerStyle}>
             <button style={backButtonStyle}>&lt;</button>
-            <h1 style={headerTitleStyle}>經期追蹤</h1>
+            <h1 style={headerTitleStyle}>Phoebe 經期追蹤</h1>
             <div style={{width: '20px'}}></div> {/* 佔位符 */}
         </header>
 
-        {/* 核心儀表板 - 圓餅圖進度條與狀態 */}
+        {/* 1. 核心儀表板 - 圓餅圖進度條與狀態 */}
         <div style={{
             ...cardStyle,
-            backgroundColor: 'white', 
-            padding: '20px', 
+            backgroundColor: currentPhase.lightColor, 
+            padding: '30px 20px', 
             textAlign: 'center', 
             marginBottom: '20px',
+            border: `1px solid ${currentPhase.lightColor}`,
         }}>
+          
             {/* 今日日期與狀態標記 */}
             <div style={todayStatusContainerStyle}>
                 <span style={todayDateStyle}>{new Date().toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日</span>
@@ -864,6 +865,7 @@ const headerStyle: React.CSSProperties = {
     backgroundColor: 'white', // 模擬白色導航欄
     top: 0,
     zIndex: 10,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.03)', // 輕微陰影
 };
 
 const backButtonStyle: React.CSSProperties = {
@@ -970,19 +972,6 @@ const dayNameStyle: React.CSSProperties = {
   color: '#777',
   padding: '8px 0',
   fontSize: '0.9rem',
-};
-
-const editButtonStyle: React.CSSProperties = {
-    backgroundColor: PHASE_RULES[3].accent, 
-    color: 'white',
-    border: 'none',
-    padding: '8px 15px',
-    borderRadius: '15px',
-    fontSize: '0.85rem',
-    cursor: 'pointer',
-    marginTop: '15px',
-    marginLeft: '10px',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
 };
 
 const gridContainerStyle: React.CSSProperties = {
@@ -1148,6 +1137,18 @@ const symptomRecordBoxStyle: React.CSSProperties = {
     marginTop: '20px',
     paddingTop: '10px',
     borderTop: '1px solid #f0f0f0',
+};
+
+const symptomButtonStyle: React.CSSProperties = {
+    border: '1px solid #ddd',
+    borderRadius: '15px',
+    padding: '5px 10px',
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+    flexGrow: 1,
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
 };
 
 export default PhoebeCycleTracker;
