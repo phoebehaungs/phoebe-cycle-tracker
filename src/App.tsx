@@ -50,8 +50,8 @@ const INITIAL_HISTORY: CycleRecord[] = [
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
 
-// 基礎規則 (天數將根據 periodLength 動態調整)
-const BASE_PHASE_RULES: PhaseDefinition[] = [
+// 核心規則 (UI 顏色與靜態資料來源)
+const PHASE_RULES: PhaseDefinition[] = [
   {
     name: '生理期',
     startDay: 1,
@@ -182,9 +182,9 @@ const createEmptyRecord = (date: string): SymptomRecord => ({
   notes: ''
 });
 
-// 根據出血天數動態調整規則
+// 根據出血天數動態調整規則 (Deep Clone)
 const getRulesForCycle = (periodLength: number = 6): PhaseDefinition[] => {
-  const rules = JSON.parse(JSON.stringify(BASE_PHASE_RULES));
+  const rules = JSON.parse(JSON.stringify(PHASE_RULES));
   // 調整生理期結束日
   rules[0].endDay = periodLength;
   // 調整濾泡期開始日 (緊接在生理期後)
