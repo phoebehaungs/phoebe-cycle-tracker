@@ -524,11 +524,10 @@ const PhoebeCycleTracker: React.FC = () => {
   return (
     <div style={appContainerStyle}>
       {/* Header */}
-      <header style={headerStyle}>
-        <button style={backButtonStyle}>&lt;</button>
-        <h1 style={headerTitleStyle}>Phoebe 經期追蹤</h1>
-        <div style={{ width: '20px' }}></div>
-      </header>
+<header style={headerStyle}>
+  <h1 style={headerTitleStyle}>PMS大作戰</h1>
+</header>
+
 
       {/* Dashboard */}
       <div
@@ -741,27 +740,31 @@ const PhoebeCycleTracker: React.FC = () => {
           </div>
         </div>
 
-        <div
-          style={{
-            ...cardStyle,
-            flex: 1,
-            padding: '20px',
-            borderTop: `4px solid ${PHASE_RULES[1].color}`,
-          }}
-        >
-          <h3 style={cardTitleStyle}>紀錄新的開始日</h3>
+<div
+  style={{
+    ...cardStyle,
+    flex: 1,
+    padding: '20px',
+    borderTop: `4px solid ${PHASE_RULES[1].color}`,
+  }}
+>
+  <h3 style={cardTitleStyle}>這次生理期第一天</h3>
 
-          <input
-            type="date"
-            value={inputDate}
-            onChange={(e) => setInputDate(e.target.value)}
-            style={inputStyle}
-          />
+  <p style={{ fontSize: '0.85rem', color: '#777', marginBottom: '8px' }}>
+    生理期來的當天，在這裡選日期按下「儲存」。
+    如果事後發現日期填錯，可以用上方的「修改本週期」調整。
+  </p>
 
-          <button onClick={handleNewPeriodRecord} style={recordButtonStyle}>
-            確認並記錄週期
-          </button>
-        </div>
+  <input
+    type="date"
+    value={inputDate}
+    onChange={(e) => setInputDate(e.target.value)}
+    style={inputStyle}
+  />
+
+  <button onClick={handleNewPeriodRecord} style={recordButtonStyle}>
+    儲存這次的生理期第一天
+  </button>
       </div>
 
       {/* Phase Tips + 今日三件小事 */}
@@ -971,19 +974,23 @@ const PhoebeCycleTracker: React.FC = () => {
               style={inputStyle}
             />
 
-            <label style={{ marginTop: '15px' }}>
-              預計週期長度（天）：
-            </label>
-            <input
-              type="number"
-              value={editCycleLength}
-              onChange={(e) =>
-                setEditCycleLength(parseInt(e.target.value) || 34)
-              }
-              min={20}
-              max={45}
-              style={inputStyle}
-            />
+           <label style={{ marginTop: '15px' }}>
+  這次生理期天數（幾天）：
+</label>
+<input
+  type="number"
+  value={editCycleLength}
+  onChange={(e) =>
+    setEditCycleLength(parseInt(e.target.value) || 5)
+  }
+  min={1}
+  max={10}
+  style={inputStyle}
+/>
+<p style={{ fontSize: '0.8rem', color: '#888', marginTop: '4px' }}>
+  （目前主要用來給妳參考，未來如果要做更細的圖表，可以再一起用到。）
+</p>
+
 
             <div
               style={{
@@ -1083,13 +1090,6 @@ const headerStyle: React.CSSProperties = {
   marginBottom: '10px',
   backgroundColor: 'white',
   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-};
-
-const backButtonStyle: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  fontSize: '1.5rem',
-  cursor: 'pointer',
 };
 
 const headerTitleStyle: React.CSSProperties = {
