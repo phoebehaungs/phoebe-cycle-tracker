@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
-// --- 1. 定義資料結構 (Type Definitions) ---
+// --- 1. 資料結構定義 ---
 
 interface PhaseDefinition {
   name: string;
@@ -23,7 +23,7 @@ interface CycleRecord {
 }
 
 interface SymptomRecord {
-  date: string; 
+  date: string;
   appetite: '低' | '中' | '高' | '';
   mood: '穩定' | '敏感/焦慮' | '低落' | '';
   body: '無水腫' | '微水腫' | '水腫明顯' | '';
@@ -48,7 +48,7 @@ const INITIAL_HISTORY: CycleRecord[] = [
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
 
-// --- 3. 專屬週期規則 ---
+// --- 3. 週期規則 ---
 
 const PHASE_RULES: PhaseDefinition[] = [
   {
@@ -60,13 +60,13 @@ const PHASE_RULES: PhaseDefinition[] = [
     care: [
       '不需要逼自己運動',
       '多喝暖身飲（紅棗黑豆枸杞茶）',
-      '早餐多一點蛋白質（減少下午嘴饞）'
+      '早餐多一點蛋白質（減少下午嘴饞）',
     ],
     tips: '這段是妳最「穩定」的時候，適合讓身體慢慢調整。',
     color: '#E95A85',
     lightColor: '#FFE7EE',
     hormone: '雌激素與黃體素低點',
-    accent: '#D63A7F'
+    accent: '#D63A7F',
   },
   {
     name: '濾泡期 (黃金期)',
@@ -77,13 +77,13 @@ const PHASE_RULES: PhaseDefinition[] = [
     care: [
       '最適合：規律吃、穩定作息',
       '若想減脂，這段最容易有成果',
-      '不需要逼運動，但 Zumba/伸展效果好'
+      '不需要逼運動，但 Zumba/伸展效果好',
     ],
     tips: '如果妳希望建立新習慣，這段最成功。',
     color: '#6AB04C',
     lightColor: '#E9F5E3',
     hormone: '雌激素逐漸上升',
-    accent: '#4CB582'
+    accent: '#4CB582',
   },
   {
     name: '排卵期',
@@ -91,15 +91,12 @@ const PHASE_RULES: PhaseDefinition[] = [
     endDay: 27,
     symptoms: ['可能出現輕微下腹悶、體溫升高', '精力正常', '水腫開始慢慢回來'],
     diet: ['食慾稍微上升'],
-    care: [
-      '多喝水、多吃蔬菜',
-      '增加可溶性纖維（玉米、地瓜）維持血糖穩定'
-    ],
+    care: ['多喝水、多吃蔬菜', '增加可溶性纖維（玉米、地瓜）維持血糖穩定'],
     tips: '這段是往黃體期過渡，通常會是出現變化的開始。',
     color: '#FFB84D',
     lightColor: '#FFF3E0',
     hormone: '黃體生成素(LH)高峰',
-    accent: '#F49B00'
+    accent: '#F49B00',
   },
   {
     name: '黃體期前段',
@@ -107,14 +104,12 @@ const PHASE_RULES: PhaseDefinition[] = [
     endDay: 29,
     symptoms: ['覺得比較容易累', '情緒敏感'],
     diet: ['開始有嘴饞的跡象', '想吃東西頻率變高'],
-    care: [
-      '提前保護：早餐加蛋白質、下午安全點心、每餐加纖維'
-    ],
+    care: ['提前保護：早餐加蛋白質、下午安全點心、每餐加纖維'],
     tips: '提前兩天準備，比發生後補救更有效。',
     color: '#8396D1',
     lightColor: '#E6E9F5',
     hormone: '黃體素開始上升',
-    accent: '#896CD9'
+    accent: '#896CD9',
   },
   {
     name: 'PMS 高峰',
@@ -126,21 +121,21 @@ const PHASE_RULES: PhaseDefinition[] = [
       '維持血糖穩定 (早餐+蛋白質/下午安全點心/纖維)',
       '補充鎂（減少焦慮和暴食衝動）',
       '允許自己多吃 5～10% (降低暴食感)',
-      '情緒安撫組 (熱茶/小毯子/深呼吸)'
+      '情緒安撫組 (熱茶/小毯子/深呼吸)',
     ],
     tips: '這是妳最辛苦、最典型的 PMS 時段，請對自己特別溫柔對待。',
     color: '#C76A9A',
     lightColor: '#F4E5ED',
     hormone: '黃體素高峰 / 準備下降',
-    accent: '#D1589F'
-  }
+    accent: '#D1589F',
+  },
 ];
 
 const SYMPTOM_OPTIONS = {
   appetite: ['低', '中', '高'],
   mood: ['穩定', '敏感/焦慮', '低落'],
   body: ['無水腫', '微水腫', '水腫明顯'],
-  sleep: ['良好', '普通', '睡不好']
+  sleep: ['良好', '普通', '睡不好'],
 };
 
 // --- 4. Helper functions ---
@@ -155,8 +150,8 @@ const getFormattedDate = (date: Date): string => {
 const getDaysDifference = (date1: string, date2: string): number => {
   const d1 = new Date(date1);
   const d2 = new Date(date2);
-  d1.setHours(0,0,0,0);
-  d2.setHours(0,0,0,0);
+  d1.setHours(0, 0, 0, 0);
+  d2.setHours(0, 0, 0, 0);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
@@ -178,7 +173,7 @@ const createEmptyRecord = (date: string): SymptomRecord => ({
   mood: '',
   body: '',
   sleep: '',
-  notes: ''
+  notes: '',
 });
 
 // --- 5. 主組件 ---
@@ -221,20 +216,22 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const [editMode, setEditMode] = useState(false);
   const [editCycleLength, setEditCycleLength] = useState(34);
-  const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
+  const [editDate, setEditDate] = useState(
+    history[history.length - 1].startDate
+  );
 
-  // 取得現在週期
+  // 當前週期
   const currentCycle = history[history.length - 1];
   const lastStartDate = currentCycle.startDate;
-
   const todayStr = getFormattedDate(new Date());
 
-  const daysPassed = useMemo(() => {
-    return getDaysDifference(lastStartDate, todayStr) + 1;
-  }, [lastStartDate, todayStr]);
+  const daysPassed = useMemo(
+    () => getDaysDifference(lastStartDate, todayStr) + 1,
+    [lastStartDate, todayStr]
+  );
 
   const averageCycleLength = useMemo(() => {
-    const completed = history.filter(h => h.length !== null);
+    const completed = history.filter((h) => h.length !== null);
     if (completed.length === 0) return 34;
     const total = completed.reduce((s, h) => s + (h.length || 0), 0);
     return Math.round(total / completed.length);
@@ -242,7 +239,7 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const currentPhase = useMemo(() => {
     const found = PHASE_RULES.find(
-      p => daysPassed >= p.startDay && daysPassed <= p.endDay
+      (p) => daysPassed >= p.startDay && daysPassed <= p.endDay
     );
     const last = PHASE_RULES[PHASE_RULES.length - 1];
     return found || last;
@@ -251,21 +248,21 @@ const PhoebeCycleTracker: React.FC = () => {
   const nextPeriodDate = addDays(lastStartDate, averageCycleLength);
   const nextPMSDate = addDays(nextPeriodDate, -7);
 
-  const progressPercent = useMemo(() => {
-    return Math.min(100, (daysPassed / averageCycleLength) * 100);
-  }, [daysPassed, averageCycleLength]);
+  const progressPercent = useMemo(
+    () => Math.min(100, (daysPassed / averageCycleLength) * 100),
+    [daysPassed, averageCycleLength]
+  );
 
   const getSymptomRecordForDate = useCallback(
-    (dateStr: string) => symptomRecords.find(r => r.date === dateStr),
+    (dateStr: string) => symptomRecords.find((r) => r.date === dateStr),
     [symptomRecords]
   );
 
-  // 取得某日期所屬階段
   const getPhaseForDate = useCallback(
     (date: Date): PhaseDefinition | undefined => {
       const dateStr = getFormattedDate(date);
 
-      // 1. 檢查已完成週期
+      // 已完成週期
       for (let i = history.length - 2; i >= 0; i--) {
         const h = history[i];
         if (h.length !== null) {
@@ -274,18 +271,18 @@ const PhoebeCycleTracker: React.FC = () => {
           if (dateStr >= s && dateStr <= e) {
             const day = getDaysDifference(s, dateStr) + 1;
             return PHASE_RULES.find(
-              p => day >= p.startDay && day <= p.endDay
+              (p) => day >= p.startDay && day <= p.endDay
             );
           }
         }
       }
 
-      // 2. 當前週期
+      // 當前週期
       const cur = history[history.length - 1];
       if (dateStr >= cur.startDate) {
         const day = getDaysDifference(cur.startDate, dateStr) + 1;
         const found = PHASE_RULES.find(
-          p => day >= p.startDay && day <= p.endDay
+          (p) => day >= p.startDay && day <= p.endDay
         );
         return found || PHASE_RULES[PHASE_RULES.length - 1];
       }
@@ -295,7 +292,6 @@ const PhoebeCycleTracker: React.FC = () => {
     [history]
   );
 
-  // 產生月曆格子
   const generateCalendarDays = useMemo(() => {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
@@ -324,13 +320,11 @@ const PhoebeCycleTracker: React.FC = () => {
     return days;
   }, [currentMonth]);
 
-  // 點擊某天
   const handleDateClick = (date: Date) => {
     const dateStr = getFormattedDate(date);
     const phase = getPhaseForDate(date);
     if (!phase) return;
 
-    // 找開始日
     let cycleStart = lastStartDate;
 
     if (dateStr < cycleStart) {
@@ -358,24 +352,15 @@ const PhoebeCycleTracker: React.FC = () => {
       date: dateStr,
       day: cycleDay,
       phase,
-      record
+      record,
     });
   };
 
-  // 修改紀錄內容
-  const handleRecordChange = (field: keyof SymptomRecord, value: string) => {
-    setCurrentRecord((prev) => {
-      if (!prev) return prev;
-      return { ...prev, [field]: value };
-    });
-  };
-
-  // 儲存每日紀錄
   const handleSaveSymptomRecord = () => {
     if (!currentRecord) return;
 
     const date = currentRecord.date;
-    const idx = symptomRecords.findIndex(r => r.date === date);
+    const idx = symptomRecords.findIndex((r) => r.date === date);
 
     const isBlank =
       currentRecord.appetite === '' &&
@@ -402,7 +387,16 @@ const PhoebeCycleTracker: React.FC = () => {
     alert(`已儲存 ${date} 的個人紀錄。`);
   };
 
-  // 新增週期開始
+  const handleRecordChange = (field: keyof SymptomRecord, value: string) => {
+    setCurrentRecord((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [field]: value,
+      };
+    });
+  };
+
   const handleNewPeriodRecord = () => {
     if (!window.confirm(`確定要在 ${inputDate} 開始新的生理期嗎？`)) return;
 
@@ -410,7 +404,7 @@ const PhoebeCycleTracker: React.FC = () => {
     const prevLength = getDaysDifference(lastStartDate, newStart);
 
     if (prevLength <= 0) {
-      alert("錯誤：新的開始日不能早於或等於上一個開始日！");
+      alert('錯誤：新的開始日不能早於或等於上一個開始日！');
       return;
     }
 
@@ -419,14 +413,13 @@ const PhoebeCycleTracker: React.FC = () => {
     updated.push({
       id: Date.now().toString(),
       startDate: newStart,
-      length: null
+      length: null,
     });
 
     setHistory(updated);
     setCurrentMonth(new Date(newStart));
   };
 
-  // 儲存週期編輯
   const handleSaveEdit = () => {
     const updated = [...history];
 
@@ -445,7 +438,6 @@ const PhoebeCycleTracker: React.FC = () => {
     setEditMode(false);
   };
 
-  // 改月曆月份
   const goToPreviousMonth = () => {
     const m = new Date(currentMonth);
     m.setMonth(m.getMonth() - 1);
@@ -465,17 +457,15 @@ const PhoebeCycleTracker: React.FC = () => {
     }
   }, [editMode, lastStartDate, averageCycleLength]);
 
-  // --- UI Rendering ---
-
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+
+  // --- UI ---
 
   return (
     <div style={appContainerStyle}>
-
       {/* Header */}
       <header style={headerStyle}>
         <h1 style={headerTitleStyle}>PMS大作戰</h1>
-        <div style={{ width: '20px' }}></div>
       </header>
 
       {/* Dashboard */}
@@ -489,10 +479,13 @@ const PhoebeCycleTracker: React.FC = () => {
           border: `1px solid ${currentPhase.lightColor}`,
         }}
       >
-        {/* Today Info */}
         <div style={todayStatusContainerStyle}>
           <span style={todayDateStyle}>
-            {new Date().toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
+            {new Date().toLocaleDateString('zh-TW', {
+              month: 'numeric',
+              day: 'numeric',
+            })}
+            日
           </span>
           <span style={todayLabelStyle}>今天</span>
 
@@ -507,7 +500,6 @@ const PhoebeCycleTracker: React.FC = () => {
           </button>
         </div>
 
-        {/* Circle Progress */}
         <div style={circularChartContainerStyle}>
           <div
             style={{
@@ -530,7 +522,6 @@ const PhoebeCycleTracker: React.FC = () => {
             </div>
           </div>
 
-          {/* Phase Text */}
           <div style={statusTextStyle}>
             <div
               style={{
@@ -601,7 +592,9 @@ const PhoebeCycleTracker: React.FC = () => {
             const record = getSymptomRecordForDate(dateStr);
             const isToday = dateStr === todayStr;
             const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-            const isPeriodStart = history.some((h) => h.startDate === dateStr);
+            const isPeriodStart = history.some(
+              (h) => h.startDate === dateStr
+            );
 
             return (
               <div
@@ -645,7 +638,7 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Prediction + Add Records */}
+      {/* Prediction + New Period */}
       <div style={gridContainerStyle}>
         <div
           style={{
@@ -690,17 +683,7 @@ const PhoebeCycleTracker: React.FC = () => {
             borderTop: `4px solid ${PHASE_RULES[1].color}`,
           }}
         >
-          <h3 style={cardTitleStyle}>這次生理期第一天</h3>
-          <p
-            style={{
-              fontSize: '0.85rem',
-              color: '#777',
-              marginBottom: '8px',
-            }}
-          >
-            生理期來的當天，在這裡選日期並按下「儲存」。如果事後發現日期填錯，
-            可以用上方的「修改本週期」調整這次的開始日。
-          </p>
+          <h3 style={cardTitleStyle}>紀錄新的開始日</h3>
 
           <input
             type="date"
@@ -710,7 +693,7 @@ const PhoebeCycleTracker: React.FC = () => {
           />
 
           <button onClick={handleNewPeriodRecord} style={recordButtonStyle}>
-            儲存這次的生理期第一天
+            確認並記錄週期
           </button>
         </div>
       </div>
@@ -726,7 +709,6 @@ const PhoebeCycleTracker: React.FC = () => {
           </p>
         </div>
 
-        {/* Symptoms */}
         <div style={cardStyle}>
           <h3 style={cardTitleStyle}>🌡️ 身體症狀與食慾</h3>
           <ul style={listListStyle}>
@@ -736,7 +718,6 @@ const PhoebeCycleTracker: React.FC = () => {
           </ul>
         </div>
 
-        {/* Care Items */}
         <div
           style={{
             ...cardStyle,
@@ -786,7 +767,6 @@ const PhoebeCycleTracker: React.FC = () => {
               )}
             </ul>
 
-            {/* Daily Record UI */}
             <div style={symptomRecordBoxStyle}>
               <h4
                 style={{
@@ -826,7 +806,6 @@ const PhoebeCycleTracker: React.FC = () => {
                 onChange={(v) => handleRecordChange('sleep', v)}
               />
 
-              {/* Notes */}
               <div style={{ marginTop: '10px' }}>
                 <label
                   style={{
@@ -892,11 +871,7 @@ const PhoebeCycleTracker: React.FC = () => {
           <div style={modalContentStyle}>
             <h3 style={{ color: PHASE_RULES[3].accent }}>📅 修改本次週期</h3>
 
-            <p style={{ marginBottom: '8px' }}>
-              目前紀錄的這次生理期第一天：<strong>{lastStartDate}</strong>
-            </p>
-
-            <label>新的生理期第一天：</label>
+            <label>新的開始日期：</label>
             <input
               type="date"
               value={editDate}
@@ -904,17 +879,15 @@ const PhoebeCycleTracker: React.FC = () => {
               style={inputStyle}
             />
 
-            <label style={{ marginTop: '15px' }}>
-              這次生理期天數（幾天）：
-            </label>
+            <label style={{ marginTop: '15px' }}>生理期天數：</label>
             <input
               type="number"
               value={editCycleLength}
               onChange={(e) =>
                 setEditCycleLength(parseInt(e.target.value) || 34)
               }
-              min={1}
-              max={10}
+              min={20}
+              max={45}
               style={inputStyle}
             />
 
@@ -930,8 +903,6 @@ const PhoebeCycleTracker: React.FC = () => {
                 style={{
                   ...modalCloseButtonStyle,
                   backgroundColor: '#aaa',
-                  width: '48%',
-                  marginTop: 0,
                 }}
               >
                 取消
@@ -942,11 +913,9 @@ const PhoebeCycleTracker: React.FC = () => {
                 style={{
                   ...modalCloseButtonStyle,
                   backgroundColor: PHASE_RULES[3].accent,
-                  width: '48%',
-                  marginTop: 0,
                 }}
               >
-                儲存修改
+                儲存
               </button>
             </div>
           </div>
@@ -957,6 +926,7 @@ const PhoebeCycleTracker: React.FC = () => {
 };
 
 // --- 子元件 ---
+
 interface RecordDropdownProps {
   label: string;
   options: string[];
@@ -1001,7 +971,7 @@ const RecordDropdown: React.FC<RecordDropdownProps> = ({
   </div>
 );
 
-// --- Styles (已移除不用的 backButtonStyle) ---
+// --- Styles ---
 
 const appContainerStyle: React.CSSProperties = {
   maxWidth: '600px',
@@ -1014,7 +984,7 @@ const appContainerStyle: React.CSSProperties = {
 
 const headerStyle: React.CSSProperties = {
   display: 'flex',
-  justifyContent: 'space-between',
+  justifyContent: 'center',
   alignItems: 'center',
   padding: '15px 0',
   marginBottom: '10px',
@@ -1023,7 +993,7 @@ const headerStyle: React.CSSProperties = {
 };
 
 const headerTitleStyle: React.CSSProperties = {
-  fontSize: '1.2rem',
+  fontSize: '1.4rem',
   margin: 0,
 };
 
@@ -1033,6 +1003,7 @@ const editButtonInlineStyle: React.CSSProperties = {
   color: PHASE_RULES[3].accent,
   fontWeight: 'bold',
   cursor: 'pointer',
+  marginLeft: 'auto',
 };
 
 const todayStatusContainerStyle: React.CSSProperties = {
@@ -1067,7 +1038,7 @@ const cardTitleStyle: React.CSSProperties = {
 
 const listListStyle: React.CSSProperties = {
   paddingLeft: '20px',
-  lineHeight: '1.7',
+  lineHeight: 1.7,
 };
 
 const calendarNavButtonStyle: React.CSSProperties = {
@@ -1116,6 +1087,7 @@ const gridContainerStyle: React.CSSProperties = {
   display: 'flex',
   gap: '20px',
   flexWrap: 'wrap',
+  marginTop: '30px',
 };
 
 const inputStyle: React.CSSProperties = {
