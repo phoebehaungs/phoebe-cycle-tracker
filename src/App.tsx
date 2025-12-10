@@ -1060,7 +1060,7 @@ const cardStyle: React.CSSProperties = {
 
 const cardTitleStyle: React.CSSProperties = {
   fontSize: '1.1rem',
-  borderBottom: '2px solid '#eee',
+  borderBottom: '2px solid #eee',
   paddingBottom: '5px',
   marginBottom: '10px',
 };
