@@ -31,12 +31,12 @@ interface DateDetail {
 
 // 初始數據：若 localStorage 沒有數據則使用這個
 const INITIAL_HISTORY: CycleRecord[] = [
-    { id: '1', startDate: '2025-11-05', length: 34 },
-    { id: '2', startDate: '2025-12-09', length: null },
+    { id: '1', startDate: '2025-11-05', length: 34 }, // 上一週期
+    { id: '2', startDate: '2025-12-09', length: null }, // 當前週期 (假設當前日期為 2025-12-10)
 ];
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 
-// 新的配色方案：柔和、清新
+// 核心階段規則 (已根據您的上次週期長度 34 天調整 PMS 結束日)
 const PHASE_RULES: PhaseDefinition[] = [
   {
     name: '生理期',
@@ -85,7 +85,7 @@ const PHASE_RULES: PhaseDefinition[] = [
   {
     name: 'PMS 高峰',
     startDay: 30,
-    endDay: 40,
+    endDay: 33, // 根據您上次週期長度 34 天，將這裡的預設結束日調整
     symptoms: ['焦慮', '睡不好', '水腫', '罪惡感', '子宮收縮'],
     diet: ['想吃甜/冰', '正餐後還想吃', '食慾高峰'],
     care: ['補充鎂', '低負擔運動(伸展)', '允許自己多吃 5-10%', '深呼吸'],
@@ -93,6 +93,61 @@ const PHASE_RULES: PhaseDefinition[] = [
     lightColor: '#F2D9E7',
     hormone: '黃體素高峰 / 準備下降',
   },
+];
+
+// 上次週期（ID: 1, Start: 2025-11-05）的客製化歷史數據
+const LAST_CYCLE_DETAILS = [
+    {
+        name: '生理期',
+        days: 'Day 1–6',
+        dates: '11/5–11/10',
+        color: PHASE_RULES[0].color,
+        content: [
+            '疲倦、想休息、想吃冰',
+            '食慾低～中',
+        ]
+    },
+    {
+        name: '濾泡期 (黃金期)',
+        days: 'Day 7–24',
+        dates: '11/11–11/28',
+        color: PHASE_RULES[1].color,
+        content: [
+            '精力恢復、心情穩定',
+            '食慾最低、最好控制',
+        ]
+    },
+    {
+        name: '排卵期',
+        days: 'Day 25–27',
+        dates: '11/29–12/1',
+        color: PHASE_RULES[2].color,
+        content: [
+            '微水腫、下腹不適',
+            '食慾微增',
+        ]
+    },
+    {
+        name: '黃體期前段',
+        days: 'Day 28–29',
+        dates: '12/2–12/3',
+        color: PHASE_RULES[3].color,
+        content: [
+            '情緒敏感、容易累',
+            '開始嘴饞',
+        ]
+    },
+    {
+        name: 'PMS 高峰',
+        days: 'Day 30–34', // 總長 34 天 (Day 30 - Day 34)
+        dates: '12/4–12/9',
+        color: PHASE_RULES[4].color,
+        content: [
+            '想吃甜、想吃冰、正餐後還想吃 (食慾)',
+            '焦慮、睡不好、水腫、罪惡感 (症狀)',
+            '子宮收縮（Day 33 / 12/7）',
+        ]
+    },
 ];
 
 
@@ -179,7 +234,11 @@ const PhoebeCycleTracker: React.FC = () => {
       const phase = PHASE_RULES.find(
         (p) => daysPassed >= p.startDay && daysPassed <= p.endDay
       );
-      return phase || PHASE_RULES[PHASE_RULES.length - 1];
+      // 如果超過了最長的結束日，則停留在最後一期
+      const lastPhase = PHASE_RULES[PHASE_RULES.length - 1];
+      if (daysPassed > lastPhase.endDay) return lastPhase; 
+
+      return phase || lastPhase;
     }, [daysPassed]);
 
     const nextPeriodDate = addDays(lastStartDate, averageCycleLength);
@@ -198,9 +257,14 @@ const PhoebeCycleTracker: React.FC = () => {
 
       if (date < new Date(lastStartDate)) return undefined; 
 
-      return PHASE_RULES.find(
+      const phase = PHASE_RULES.find(
         (p) => diffDays >= p.startDay && diffDays <= p.endDay
       );
+      
+      const lastPhase = PHASE_RULES[PHASE_RULES.length - 1];
+      if (diffDays > lastPhase.endDay) return lastPhase;
+      
+      return phase;
     }, [lastStartDate]);
 
 
@@ -456,7 +520,32 @@ const PhoebeCycleTracker: React.FC = () => {
             </div>
         </div>
         
-        {/* 4. 建議卡片 */}
+        {/* 4. 上次週期詳細紀錄 (新增區塊) */}
+        <div style={{...cardStyle, marginTop: '30px'}}>
+            <h3 style={cardTitleStyle}>📖 上一次週期紀錄 (2025-11-05 ~ 2025-12-08)</h3>
+            <div style={{ padding: '0 10px' }}>
+                {LAST_CYCLE_DETAILS.map((detail, index) => (
+                    <div key={index} style={historyItemStyle}>
+                        <div style={{ 
+                            fontWeight: 'bold', 
+                            color: detail.color, 
+                            borderBottom: '2px dotted #eee',
+                            paddingBottom: '5px'
+                        }}>
+                           {detail.name} &nbsp; ({detail.days} / {detail.dates})
+                        </div>
+                        <ul style={historyListStyle}>
+                            {detail.content.map((c, i) => (
+                                <li key={i} style={{color: '#555'}}>{c}</li>
+                            ))}
+                        </ul>
+                    </div>
+                ))}
+            </div>
+        </div>
+
+
+        {/* 5. 當前週期建議卡片 */}
         <div style={{ display: 'grid', gap: '15px', marginTop: '30px' }}>
           
           {/* 症狀區 */}
@@ -561,6 +650,21 @@ const listStyle: React.CSSProperties = {
   color: '#555',
   lineHeight: '1.7'
 };
+
+const historyItemStyle: React.CSSProperties = {
+    marginBottom: '15px',
+    padding: '10px',
+    backgroundColor: '#f9f9f9',
+    borderRadius: '8px'
+}
+
+const historyListStyle: React.CSSProperties = {
+    margin: '8px 0 0 0',
+    paddingLeft: '20px',
+    fontSize: '0.95rem',
+    color: '#666',
+    lineHeight: '1.5'
+}
 
 const calendarNavButtonStyle: React.CSSProperties = {
   backgroundColor: '#f0f0f0',
