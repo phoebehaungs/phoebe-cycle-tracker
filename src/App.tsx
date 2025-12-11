@@ -44,7 +44,7 @@ interface DateDetail {
 
 const INITIAL_HISTORY: CycleRecord[] = [
   { id: '1', startDate: '2025-11-05', length: 34, periodLength: 6 },
-  { id: '2', startDate: '2025-12-09', length: null, periodLength: 6 },
+  { id: '2', startDate: '2025-12-10', length: null, periodLength: 6 },
 ];
 
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
@@ -55,14 +55,14 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '生理期',
     startDay: 1,
     endDay: 6,
-    symptoms: ['疲倦、想休息', '偶爾子宮悶感', '心情安靜'],
+    symptoms: ['疲倦、想休息', '水腫慢慢消退中', '偶爾子宮悶感'],
     diet: ['食慾偏低/正常', '想吃冰(荷爾蒙反應)'],
     care: [
       '不逼自己運動',
       '多喝暖身飲(紅棗茶)',
       '早餐多一點蛋白質'
     ],
-    tips: '這段是妳最「穩定」的時候，適合讓身體慢慢調整。',
+    tips: '這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。',
     color: '#FF8FAB', // 溫暖粉紅
     lightColor: '#FFF0F5',
     hormone: '雌激素與黃體素低點',
@@ -72,13 +72,13 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '濾泡期 (黃金期)',
     startDay: 7,
     endDay: 24,
-    symptoms: ['精力恢復', '心情平穩', '水腫減少'],
+    symptoms: ['精力恢復', '身體最輕盈(無水腫)', '心情平穩'],
     diet: ['食慾最低', '最好控制', '飽足感良好'],
     care: [
       '適合減脂/建立習慣',
       'Zumba/伸展效果好'
     ],
-    tips: '如果妳希望建立新習慣，這段最成功！',
+    tips: '現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！',
     color: '#88D8B0', // 溫暖薄荷綠
     lightColor: '#F0FFF4',
     hormone: '雌激素逐漸上升',
@@ -88,13 +88,13 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '排卵期',
     startDay: 25,
     endDay: 27,
-    symptoms: ['下腹悶、體溫升高', '水腫慢慢回來'],
+    symptoms: ['下腹悶、體溫升高', '出現微水腫'],
     diet: ['食慾微增', '有些人想吃甜'],
     care: [
       '多喝水、多吃蔬菜',
       '補充可溶性纖維(地瓜)'
     ],
-    tips: '這段是往黃體期過渡，是身體出現變化的開始。',
+    tips: '這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。',
     color: '#FFD166', // 溫暖黃
     lightColor: '#FFFBEB',
     hormone: '黃體生成素(LH)高峰',
@@ -104,7 +104,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '黃體期前段',
     startDay: 28,
     endDay: 29,
-    symptoms: ['較容易累', '情緒敏感'],
+    symptoms: ['較容易累', '情緒敏感', '水腫感變明顯'],
     diet: ['開始嘴饞', '想吃頻率變高'],
     care: [
       '早餐加蛋白質',
@@ -120,14 +120,14 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: 'PMS 高峰',
     startDay: 30,
     endDay: 33,
-    symptoms: ['焦慮、情緒緊繃', '睡不好、水腫', '身心較沒安全感'],
+    symptoms: ['焦慮、情緒緊繃', '嚴重水腫、睡不好', '身心較沒安全感'],
     diet: ['想吃甜/冰', '正餐後仍想吃'],
     care: [
       '補充鎂(減少焦慮)',
       '允許多吃 5～10%',
       '熱茶/小毯子/深呼吸'
     ],
-    tips: '這是最辛苦的時段，請對自己特別溫柔對待。',
+    tips: '這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。',
     color: '#EF476F', // 暖洋紅
     lightColor: '#FFE5EC',
     hormone: '黃體素高峰 / 準備下降',
@@ -142,34 +142,35 @@ const SYMPTOM_OPTIONS = {
   sleep: ['良好', '普通', '睡不好']
 };
 
-// --- 3. Helper Functions ---
+// --- 3. Helper Functions (TimeZone Fixed) ---
 
-// 簡化版日期顯示 (MM/DD) 用於圖表
-const formatShortDate = (dateStr: string): string => {
-    // dateStr 格式為 "YYYY-MM-DD"
-    // 取後5位 "MM-DD"，並將 "-" 替換為 "/"
-    return dateStr.slice(5).replace('-', '/');
+const parseLocalDate = (dateStr: string): Date => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
 };
 
-const getLocalFormattedDate = (date: Date = new Date()): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+const formatLocalDate = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 };
 
-const getDaysDifference = (date1: string, date2: string): number => {
-  const d1 = new Date(date1);
-  const d2 = new Date(date2);
-  d1.setHours(0,0,0,0);
-  d2.setHours(0,0,0,0);
+const getDaysDifference = (date1Str: string, date2Str: string): number => {
+  const d1 = parseLocalDate(date1Str);
+  const d2 = parseLocalDate(date2Str);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
 const addDays = (dateStr: string, days: number): string => {
-  const r = new Date(dateStr);
-  r.setDate(r.getDate() + days);
-  return getLocalFormattedDate(r);
+  const d = parseLocalDate(dateStr);
+  d.setDate(d.getDate() + days);
+  return formatLocalDate(d);
+};
+
+// 簡化版日期顯示 (MM/DD) 用於圖表
+const formatShortDate = (dateStr: string): string => {
+    return dateStr.slice(5).replace('-', '/');
 };
 
 const startOfMonth = (date: Date): Date =>
@@ -202,7 +203,7 @@ const PhoebeCycleTracker: React.FC = () => {
     try {
       const parsed = stored ? JSON.parse(stored) : INITIAL_HISTORY;
       return parsed.sort((a: CycleRecord, b: CycleRecord) => 
-        new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+        parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime()
       );
     } catch {
       return INITIAL_HISTORY;
@@ -226,11 +227,11 @@ const PhoebeCycleTracker: React.FC = () => {
     localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords));
   }, [symptomRecords]);
 
-  const [todayStr, setTodayStr] = useState(getLocalFormattedDate());
+  const [todayStr, setTodayStr] = useState(formatLocalDate(new Date()));
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
-    setTodayStr(getLocalFormattedDate());
+    setTodayStr(formatLocalDate(new Date()));
   }, []);
 
   const [inputDate, setInputDate] = useState(todayStr); 
@@ -241,7 +242,6 @@ const PhoebeCycleTracker: React.FC = () => {
   const [editBleedingDays, setEditBleedingDays] = useState(6);
   const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
 
-  // 核心計算
   const currentCycle = history[history.length - 1];
   const lastStartDate = currentCycle.startDate;
   const currentPeriodLength = currentCycle.periodLength || 6;
@@ -282,7 +282,7 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const getPhaseForDate = useCallback(
     (date: Date): PhaseDefinition | undefined => {
-      const dateStr = getLocalFormattedDate(date);
+      const dateStr = formatLocalDate(date);
       for (let i = history.length - 2; i >= 0; i--) {
         const h = history[i];
         if (h.length !== null) {
@@ -333,7 +333,7 @@ const PhoebeCycleTracker: React.FC = () => {
   }, [currentMonth]);
 
   const handleDateClick = (date: Date) => {
-    const dateStr = getLocalFormattedDate(date);
+    const dateStr = formatLocalDate(date);
     const phase = getPhaseForDate(date);
     if (!phase) return;
 
@@ -385,11 +385,11 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const handleUpsertPeriodRecord = () => {
     if (!inputDate) return;
-    const newDateObj = new Date(inputDate);
-    const newDateStr = getLocalFormattedDate(newDateObj);
+    const newDateStr = inputDate; 
+    const newDateObj = parseLocalDate(newDateStr);
 
     const existingIndex = history.findIndex(h => {
-        const hDate = new Date(h.startDate);
+        const hDate = parseLocalDate(h.startDate);
         return hDate.getFullYear() === newDateObj.getFullYear() && 
                hDate.getMonth() === newDateObj.getMonth();
     });
@@ -403,7 +403,7 @@ const PhoebeCycleTracker: React.FC = () => {
         if (window.confirm(`檢測到 ${oldDate.slice(0,7)} 已經有一筆紀錄 (${oldDate})。\n\n您是要將其修改為 ${newDateStr} 嗎？`)) {
             const updated = [...history];
             updated[existingIndex].startDate = newDateStr;
-            updated.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+            updated.sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
             
             if (existingIndex > 0) {
                 const prevStart = updated[existingIndex - 1].startDate;
@@ -453,7 +453,7 @@ const PhoebeCycleTracker: React.FC = () => {
     updated[updated.length - 1].startDate = editDate;
     updated[updated.length - 1].periodLength = editBleedingDays;
     setHistory(updated);
-    setCurrentMonth(new Date(editDate));
+    setCurrentMonth(parseLocalDate(editDate));
     setEditMode(false);
   };
 
@@ -511,11 +511,12 @@ const PhoebeCycleTracker: React.FC = () => {
     return points.join(' ');
   };
 
-  // 計算關鍵日期
-  const edemaRiseDay = 25;
-  const stressRiseDay = 28;
-  const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
-  const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
+  // 計算關鍵日期 (從 Day 1 開始推算)
+  const stressStartDay = 15; // Day 14後 (第15天開始)
+  const edemaPeakDay = 30; // 水腫高峰開始
+
+  const stressStartDateStr = formatShortDate(addDays(lastStartDate, stressStartDay - 1));
+  const edemaPeakDateStr = formatShortDate(addDays(lastStartDate, edemaPeakDay - 1));
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -537,7 +538,7 @@ const PhoebeCycleTracker: React.FC = () => {
       <div style={dashboardCardStyle}>
         <div style={todayStatusContainerStyle}>
           <span style={todayDateStyle}>
-            {new Date(todayStr).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
+            {parseLocalDate(todayStr).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
           </span>
           <span style={todayLabelStyle}>今天</span>
 
@@ -610,7 +611,7 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* 📉 週期趨勢分析 (解決文字重疊) */}
+      {/* 📉 週期趨勢分析 */}
       <div style={{ ...cardStyle, marginTop: '20px', padding: '15px 15px 25px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h3 style={{ ...cardTitleStyle, marginBottom: 0, borderBottom: 'none' }}>📉 週期趨勢分析</h3>
@@ -664,24 +665,24 @@ const PhoebeCycleTracker: React.FC = () => {
                     stroke="#333" strokeWidth="2" strokeDasharray="3,3"
                 />
 
-                {/* Edema Rise Marker (Day 25) - High */}
+                {/* 預測點 1: 壓力開始 (Day 15) - 放在中間偏低位置 */}
                 <line 
-                    x1={((edemaRiseDay-1) / 34) * 340} y1="10" 
-                    x2={((edemaRiseDay-1) / 34) * 340} y2="140" 
-                    stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"
+                    x1={((stressStartDay-1) / 34) * 340} y1="40" 
+                    x2={((stressStartDay-1) / 34) * 340} y2="140" 
+                    stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.6"
                 />
-                <text x={((edemaRiseDay-1) / 34) * 340} y="10" fill="#29B6F6" fontSize="10" textAnchor="middle">
-                    {edemaRiseDateStr} 水腫↑
+                <text x={((stressStartDay-1) / 34) * 340} y="35" fill="#896CD9" fontSize="10" textAnchor="middle">
+                    {stressStartDateStr} 壓力始
                 </text>
 
-                 {/* Stress Rise Marker (Day 28) - Low */}
+                 {/* 預測點 2: 水腫高峰 (Day 30) - 放在頂部位置 */}
                  <line 
-                    x1={((stressRiseDay-1) / 34) * 340} y1="25" 
-                    x2={((stressRiseDay-1) / 34) * 340} y2="140" 
-                    stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"
+                    x1={((edemaPeakDay-1) / 34) * 340} y1="5" 
+                    x2={((edemaPeakDay-1) / 34) * 340} y2="140" 
+                    stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.6"
                 />
-                <text x={((stressRiseDay-1) / 34) * 340} y="25" fill="#896CD9" fontSize="10" textAnchor="middle">
-                    {stressRiseDateStr} 壓力↑
+                <text x={((edemaPeakDay-1) / 34) * 340} y="0" fill="#29B6F6" fontSize="10" textAnchor="end">
+                    {edemaPeakDateStr} 水腫高峰
                 </text>
             </svg>
             
@@ -725,7 +726,7 @@ const PhoebeCycleTracker: React.FC = () => {
             <div key={i} style={dayNameStyle}>{n}</div>
           ))}
           {generateCalendarDays.map((date, i) => {
-            const dateStr = getLocalFormattedDate(date);
+            const dateStr = formatLocalDate(date);
             const phase = getPhaseForDate(date);
             const record = getSymptomRecordForDate(dateStr);
             const isToday = dateStr === todayStr;
@@ -817,7 +818,7 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Info Cards - Only Symptoms and Care */}
+      {/* Info Cards */}
       <div style={{ display: 'grid', gap: '15px', marginTop: '20px' }}>
         <div style={cardStyle}>
           <h3 style={cardTitleStyle}>🌡️ 身體症狀與食慾</h3>
