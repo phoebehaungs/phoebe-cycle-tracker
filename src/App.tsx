@@ -57,11 +57,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     endDay: 6,
     symptoms: ['疲倦、想休息', '水腫慢慢消退中', '偶爾子宮悶感'],
     diet: ['食慾偏低/正常', '想吃冰(荷爾蒙反應)'],
-    care: [
-      '不逼自己運動',
-      '多喝暖身飲(紅棗茶)',
-      '早餐多一點蛋白質'
-    ],
+    care: ['不逼自己運動', '多喝暖身飲', '早餐多一點蛋白質'],
     tips: '這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。',
     color: '#FF8FAB', // 溫暖粉紅
     lightColor: '#FFF0F5',
@@ -74,10 +70,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     endDay: 24,
     symptoms: ['精力恢復', '身體最輕盈(無水腫)', '心情平穩'],
     diet: ['食慾最低', '最好控制', '飽足感良好'],
-    care: [
-      '適合減脂/建立習慣',
-      'Zumba/伸展效果好'
-    ],
+    care: ['適合減脂/建立習慣', 'Zumba/伸展效果好'],
     tips: '現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！',
     color: '#88D8B0', // 溫暖薄荷綠
     lightColor: '#F0FFF4',
@@ -90,10 +83,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     endDay: 27,
     symptoms: ['下腹悶、體溫升高', '出現微水腫'],
     diet: ['食慾微增', '有些人想吃甜'],
-    care: [
-      '多喝水、多吃蔬菜',
-      '補充可溶性纖維(地瓜)'
-    ],
+    care: ['多喝水、多吃蔬菜', '補充可溶性纖維'],
     tips: '這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。',
     color: '#FFD166', // 溫暖黃
     lightColor: '#FFFBEB',
@@ -106,10 +96,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     endDay: 29,
     symptoms: ['較容易累', '情緒敏感', '水腫感變明顯'],
     diet: ['開始嘴饞', '想吃頻率變高'],
-    care: [
-      '早餐加蛋白質',
-      '下午備好安全點心'
-    ],
+    care: ['早餐加蛋白質', '下午備好安全點心'],
     tips: '提前兩天準備，比發生後補救更有效。',
     color: '#A5A6F6', // 溫暖紫
     lightColor: '#F3F4FF',
@@ -121,12 +108,8 @@ const PHASE_RULES: PhaseDefinition[] = [
     startDay: 30,
     endDay: 33,
     symptoms: ['焦慮、情緒緊繃', '嚴重水腫、睡不好', '身心較沒安全感'],
-    diet: ['想吃甜/冰', '正餐後仍想吃'],
-    care: [
-      '補充鎂(減少焦慮)',
-      '允許多吃 5～10%',
-      '熱茶/小毯子/深呼吸'
-    ],
+    diet: ['想吃甜、想吃冰', '正餐後仍想吃'],
+    care: ['補充鎂(減少焦慮)', '允許多吃 5～10%', '熱茶/小毯子/深呼吸'],
     tips: '這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。',
     color: '#EF476F', // 暖洋紅
     lightColor: '#FFE5EC',
@@ -156,23 +139,20 @@ const formatLocalDate = (date: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
-const getDaysDifference = (date1: string, date2: string): number => {
-  const d1 = new Date(date1);
-  const d2 = new Date(date2);
-  d1.setHours(0,0,0,0);
-  d2.setHours(0,0,0,0);
+const getDaysDifference = (date1Str: string, date2Str: string): number => {
+  const d1 = parseLocalDate(date1Str);
+  const d2 = parseLocalDate(date2Str);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
 const addDays = (dateStr: string, days: number): string => {
-  const r = new Date(dateStr);
-  r.setDate(r.getDate() + days);
-  return formatLocalDate(r);
+  const d = parseLocalDate(dateStr);
+  d.setDate(d.getDate() + days);
+  return formatLocalDate(d);
 };
 
-// 簡化版日期顯示 (MM/DD)
 const formatShortDate = (dateStr: string): string => {
-    return dateStr.slice(5).replace('-', '/');
+  return dateStr.slice(5).replace('-', '/');
 };
 
 const startOfMonth = (date: Date): Date =>
@@ -200,50 +180,36 @@ const getRulesForCycle = (periodLength: number = 6): PhaseDefinition[] => {
 // --- 4. Main Component ---
 
 const PhoebeCycleTracker: React.FC = () => {
-  // Add Google Fonts
+  // Fonts
   useEffect(() => {
     const link = document.createElement('link');
-    link.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@400;600;700&display=swap";
+    link.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@600;700&display=swap";
     link.rel = "stylesheet";
     document.head.appendChild(link);
     return () => { document.head.removeChild(link); };
   }, []);
 
+  // State
   const [history, setHistory] = useState<CycleRecord[]>(() => {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     try {
       const parsed = stored ? JSON.parse(stored) : INITIAL_HISTORY;
-      return parsed.sort((a: CycleRecord, b: CycleRecord) => 
-        parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime()
-      );
-    } catch {
-      return INITIAL_HISTORY;
-    }
+      return parsed.sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
+    } catch { return INITIAL_HISTORY; }
   });
 
   const [symptomRecords, setSymptomRecords] = useState<SymptomRecord[]>(() => {
     const stored = localStorage.getItem(SYMPTOM_STORAGE_KEY);
-    try {
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
+    try { return stored ? JSON.parse(stored) : []; } catch { return []; }
   });
 
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(history));
-  }, [history]);
-
-  useEffect(() => {
-    localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords));
-  }, [symptomRecords]);
+  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(history)); }, [history]);
+  useEffect(() => { localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords)); }, [symptomRecords]);
 
   const [todayStr, setTodayStr] = useState(formatLocalDate(new Date()));
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  useEffect(() => {
-    setTodayStr(formatLocalDate(new Date()));
-  }, []);
+  useEffect(() => { setTodayStr(formatLocalDate(new Date())); }, []);
 
   const [inputDate, setInputDate] = useState(todayStr); 
   const [modalDetail, setModalDetail] = useState<DateDetail | null>(null);
@@ -253,14 +219,12 @@ const PhoebeCycleTracker: React.FC = () => {
   const [editBleedingDays, setEditBleedingDays] = useState(6);
   const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
 
-  // 核心計算
+  // Calculations
   const currentCycle = history[history.length - 1];
   const lastStartDate = currentCycle.startDate;
   const currentPeriodLength = currentCycle.periodLength || 6;
 
-  const daysPassed = useMemo(() => {
-    return getDaysDifference(lastStartDate, todayStr) + 1;
-  }, [lastStartDate, todayStr]);
+  const daysPassed = useMemo(() => getDaysDifference(lastStartDate, todayStr) + 1, [lastStartDate, todayStr]);
 
   const averageCycleLength = useMemo(() => {
     const completed = history.filter(h => h.length !== null);
@@ -272,54 +236,41 @@ const PhoebeCycleTracker: React.FC = () => {
   const currentRules = useMemo(() => getRulesForCycle(currentPeriodLength), [currentPeriodLength]);
 
   const currentPhase = useMemo(() => {
-    const found = currentRules.find(
-      p => daysPassed >= p.startDay && daysPassed <= p.endDay
-    );
+    const found = currentRules.find(p => daysPassed >= p.startDay && daysPassed <= p.endDay);
     const last = currentRules[currentRules.length - 1];
-    if (daysPassed > last.endDay) return last;
-    return found || last;
+    return (daysPassed > last.endDay) ? last : (found || last);
   }, [daysPassed, currentRules]);
 
   const nextPeriodDate = addDays(lastStartDate, averageCycleLength);
   const nextPMSDate = addDays(nextPeriodDate, -7);
+  const progressPercent = useMemo(() => Math.min(100, (daysPassed / averageCycleLength) * 100), [daysPassed, averageCycleLength]);
 
-  const progressPercent = useMemo(() => {
-    return Math.min(100, (daysPassed / averageCycleLength) * 100);
-  }, [daysPassed, averageCycleLength]);
+  const getSymptomRecordForDate = useCallback((dateStr: string) => symptomRecords.find(r => r.date === dateStr), [symptomRecords]);
 
-  const getSymptomRecordForDate = useCallback(
-    (dateStr: string) => symptomRecords.find(r => r.date === dateStr),
-    [symptomRecords]
-  );
-
-  const getPhaseForDate = useCallback(
-    (date: Date): PhaseDefinition | undefined => {
-      const dateStr = formatLocalDate(date);
-      for (let i = history.length - 2; i >= 0; i--) {
-        const h = history[i];
-        if (h.length !== null) {
-          const s = h.startDate;
-          const e = addDays(s, h.length - 1);
-          if (dateStr >= s && dateStr <= e) {
-            const day = getDaysDifference(s, dateStr) + 1;
-            const histRules = getRulesForCycle(h.periodLength || 6);
-            return histRules.find(p => day >= p.startDay && day <= p.endDay);
-          }
+  const getPhaseForDate = useCallback((date: Date) => {
+    const dateStr = formatLocalDate(date);
+    for (let i = history.length - 2; i >= 0; i--) {
+      const h = history[i];
+      if (h.length !== null) {
+        const s = h.startDate;
+        const e = addDays(s, h.length - 1);
+        if (dateStr >= s && dateStr <= e) {
+          const day = getDaysDifference(s, dateStr) + 1;
+          const histRules = getRulesForCycle(h.periodLength || 6);
+          return histRules.find(p => day >= p.startDay && day <= p.endDay);
         }
       }
-      const cur = history[history.length - 1];
-      if (dateStr >= cur.startDate) {
-        const day = getDaysDifference(cur.startDate, dateStr) + 1;
-        const curRules = getRulesForCycle(cur.periodLength || 6);
-        const found = curRules.find(p => day >= p.startDay && day <= p.endDay);
-        const last = curRules[curRules.length - 1];
-        if (day > last.endDay) return last;
-        return found || last;
-      }
-      return undefined;
-    },
-    [history]
-  );
+    }
+    const cur = history[history.length - 1];
+    if (dateStr >= cur.startDate) {
+      const day = getDaysDifference(cur.startDate, dateStr) + 1;
+      const curRules = getRulesForCycle(cur.periodLength || 6);
+      const found = curRules.find(p => day >= p.startDay && day <= p.endDay);
+      const last = curRules[curRules.length - 1];
+      return (day > last.endDay) ? last : (found || last);
+    }
+    return undefined;
+  }, [history]);
 
   const generateCalendarDays = useMemo(() => {
     const start = startOfMonth(currentMonth);
@@ -344,11 +295,11 @@ const PhoebeCycleTracker: React.FC = () => {
     return days;
   }, [currentMonth]);
 
+  // Handlers
   const handleDateClick = (date: Date) => {
     const dateStr = formatLocalDate(date);
     const phase = getPhaseForDate(date);
     if (!phase) return;
-
     let cycleStart = lastStartDate;
     if (dateStr < cycleStart) {
       for (let i = history.length - 2; i >= 0; i--) {
@@ -356,19 +307,14 @@ const PhoebeCycleTracker: React.FC = () => {
         if (h.length !== null) {
           const s = h.startDate;
           const e = addDays(s, h.length - 1);
-          if (dateStr >= s && dateStr <= e) {
-            cycleStart = s;
-            break;
-          }
+          if (dateStr >= s && dateStr <= e) { cycleStart = s; break; }
         }
       }
     }
     const cycleDay = getDaysDifference(cycleStart, dateStr) + 1;
     if (cycleDay <= 0) return;
-
     const existing = getSymptomRecordForDate(dateStr);
     const record = existing || createEmptyRecord(dateStr);
-
     setCurrentRecord(record);
     setModalDetail({ date: dateStr, day: cycleDay, phase, record });
   };
@@ -377,12 +323,7 @@ const PhoebeCycleTracker: React.FC = () => {
     if (!currentRecord) return;
     const date = currentRecord.date;
     const idx = symptomRecords.findIndex(r => r.date === date);
-    const isBlank =
-      currentRecord.appetite === '' &&
-      currentRecord.mood === '' &&
-      currentRecord.body === '' &&
-      currentRecord.sleep === '' &&
-      currentRecord.notes.trim() === '';
+    const isBlank = Object.values(currentRecord).slice(1).every(v => v === '');
     const newRecords = [...symptomRecords];
     if (isBlank) {
       if (idx !== -1) newRecords.splice(idx, 1);
@@ -392,93 +333,54 @@ const PhoebeCycleTracker: React.FC = () => {
     }
     setSymptomRecords(newRecords);
     setModalDetail(null);
-    setCurrentRecord(null);
   };
 
   const handleUpsertPeriodRecord = () => {
     if (!inputDate) return;
-    const newDateObj = parseLocalDate(inputDate);
     const newDateStr = inputDate;
-
+    const newDateObj = parseLocalDate(newDateStr);
     const existingIndex = history.findIndex(h => {
         const hDate = parseLocalDate(h.startDate);
-        return hDate.getFullYear() === newDateObj.getFullYear() && 
-               hDate.getMonth() === newDateObj.getMonth();
+        return hDate.getFullYear() === newDateObj.getFullYear() && hDate.getMonth() === newDateObj.getMonth();
     });
 
     if (existingIndex !== -1) {
         const oldDate = history[existingIndex].startDate;
-        if (oldDate === newDateStr) {
-            alert("該日期已經是生理期開始日了。");
-            return;
-        }
-        if (window.confirm(`檢測到 ${oldDate.slice(0,7)} 已經有一筆紀錄 (${oldDate})。\n\n您是要將其修改為 ${newDateStr} 嗎？`)) {
+        if (oldDate === newDateStr) { alert("該日期已是生理期開始日"); return; }
+        if (window.confirm(`檢測到本月已有紀錄 (${oldDate})。要修改為 ${newDateStr} 嗎？`)) {
             const updated = [...history];
             updated[existingIndex].startDate = newDateStr;
             updated.sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
-            
-            if (existingIndex > 0) {
-                const prevStart = updated[existingIndex - 1].startDate;
-                updated[existingIndex - 1].length = getDaysDifference(prevStart, newDateStr);
-            }
-            if (existingIndex < updated.length - 1) {
-                const nextStart = updated[existingIndex + 1].startDate;
-                updated[existingIndex].length = getDaysDifference(newDateStr, nextStart);
-            }
+            if (existingIndex > 0) updated[existingIndex - 1].length = getDaysDifference(updated[existingIndex - 1].startDate, newDateStr);
+            if (existingIndex < updated.length - 1) updated[existingIndex].length = getDaysDifference(newDateStr, updated[existingIndex + 1].startDate);
             setHistory(updated);
             setCurrentMonth(newDateObj);
-            alert("已更新生理期日期！");
+            alert("已更新！");
             return;
         }
     }
-
-    if (!window.confirm(`確定要將 ${newDateStr} 設為這次生理期第一天嗎？`)) return;
-
+    if (!window.confirm(`將 ${newDateStr} 設為這次生理期第一天？`)) return;
     const updated = [...history];
     const lastRec = updated[updated.length - 1];
     const diff = getDaysDifference(lastRec.startDate, newDateStr);
-    
     if (diff > 0) {
         lastRec.length = diff;
-        updated.push({
-            id: Date.now().toString(),
-            startDate: newDateStr,
-            length: null,
-            periodLength: 6
-        });
+        updated.push({ id: Date.now().toString(), startDate: newDateStr, length: null, periodLength: 6 });
         setHistory(updated);
         setCurrentMonth(newDateObj);
-    } else {
-        alert("日期必須晚於上一次生理期！");
-    }
+    } else { alert("日期無效"); }
   };
 
   const handleSaveEdit = () => {
     const updated = [...history];
     if (updated.length >= 2) {
-      const prev = getDaysDifference(
-        updated[updated.length - 2].startDate,
-        editDate
-      );
-      updated[updated.length - 2].length = prev;
+      updated[updated.length - 2].length = getDaysDifference(updated[updated.length - 2].startDate, editDate);
     }
     updated[updated.length - 1].startDate = editDate;
     updated[updated.length - 1].periodLength = editBleedingDays;
     setHistory(updated);
     setCurrentMonth(parseLocalDate(editDate));
     setEditMode(false);
-  };
-
-  const goToPreviousMonth = () => {
-    const m = new Date(currentMonth);
-    m.setMonth(m.getMonth() - 1);
-    setCurrentMonth(m);
-  };
-
-  const goToNextMonth = () => {
-    const m = new Date(currentMonth);
-    m.setMonth(m.getMonth() + 1);
-    setCurrentMonth(m);
   };
 
   useEffect(() => {
@@ -488,49 +390,52 @@ const PhoebeCycleTracker: React.FC = () => {
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
 
-  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {
+  // --- 分層曲線圖邏輯 (Separated Tracks) ---
+  const getTrackPoints = (width: number, rowHeight: number, type: 'appetite' | 'hormone' | 'edema', offsetY: number) => {
     const points: string[] = [];
     const totalDays = 34; 
     const stepX = width / totalDays;
     
     for (let day = 1; day <= totalDays; day++) {
-        let intensity = 50; 
+        let intensity = 0; // 0=Low, 1=High
         
-        // 視覺分離：食慾向下偏移(+3)，水腫向上偏移(-3)，避免完全重疊
-        if (type === 'appetite') {
-            if (day <= 6) intensity = 60 + 3;
-            else if (day <= 24) intensity = 90 + 3;
-            else if (day <= 27) intensity = 50 + 3;
-            else if (day <= 29) intensity = 40 + 3;
-            else intensity = 10 + 3;
-        } else if (type === 'hormone') {
-            if (day <= 14) intensity = 80;
-            else if (day <= 24) intensity = 40;
-            else if (day <= 28) intensity = 20;
-            else intensity = 85;
-        } else if (type === 'edema') {
-            if (day <= 3) intensity = 40 - 3;
-            else if (day <= 6) intensity = 70 - 3;
-            else if (day <= 24) intensity = 95 - 3;
-            else if (day <= 27) intensity = 60 - 3;
-            else if (day <= 29) intensity = 40 - 3;
-            else intensity = 10 - 3;
+        if (type === 'appetite') { // 食慾：PMS高, 濾泡低
+            if (day <= 6) intensity = 0.4;
+            else if (day <= 24) intensity = 0.1;
+            else if (day <= 27) intensity = 0.5;
+            else if (day <= 29) intensity = 0.6;
+            else intensity = 0.9;
+        } else if (type === 'hormone') { // 壓力：PMS不穩
+            if (day <= 14) intensity = 0.2;
+            else if (day <= 24) intensity = 0.4;
+            else if (day <= 28) intensity = 0.6; // 壓力開始上升
+            else intensity = 0.85;
+        } else if (type === 'edema') { // 水腫：PMS最腫
+            if (day <= 3) intensity = 0.6;
+            else if (day <= 6) intensity = 0.3;
+            else if (day <= 24) intensity = 0.05;
+            else if (day <= 27) intensity = 0.4;
+            else if (day <= 29) intensity = 0.6;
+            else intensity = 0.9;
         }
         
+        // 轉換為 Y 座標 (反轉：1=Top, 0=Bottom within row)
+        // Row Top = offsetY, Row Bottom = offsetY + rowHeight
+        // intensity 1 => Top (y = offsetY + padding)
+        // intensity 0 => Bottom (y = offsetY + rowHeight - padding)
+        const padding = 5;
+        const h = rowHeight - (padding * 2);
+        const y = (offsetY + rowHeight - padding) - (intensity * h);
         const x = (day - 1) * stepX;
-        const y = (intensity / 100) * height;
         points.push(`${x},${y}`);
     }
     return points.join(' ');
   };
 
-  // 計算關鍵日期 (從 Day 1 開始推算)
-  // Day 25: 水腫 & 食慾上升 (Combined)
-  // Day 28: 壓力上升 (Independent)
-  // Day 30: 高峰 (All)
-  const day25Str = formatShortDate(addDays(lastStartDate, 24));
-  const day28Str = formatShortDate(addDays(lastStartDate, 27));
-  const day30Str = formatShortDate(addDays(lastStartDate, 29));
+  // 關鍵日期計算
+  const edemaRiseDay = 25;
+  const stressRiseDay = 28;
+  const pmsPeakDay = 30;
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -555,174 +460,71 @@ const PhoebeCycleTracker: React.FC = () => {
             {parseLocalDate(todayStr).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
           </span>
           <span style={todayLabelStyle}>今天</span>
-
           <button
-            onClick={() => {
-              setEditDate(lastStartDate);
-              setEditMode(true);
-            }}
-            style={{
-                background: 'none',
-                border: 'none',
-                color: currentPhase.accent,
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                marginLeft: 'auto',
-                fontFamily: 'Nunito, Noto Sans TC, sans-serif'
-            }}
+            onClick={() => { setEditDate(lastStartDate); setEditMode(true); }}
+            style={{ background: 'none', border: 'none', color: currentPhase.accent, fontWeight: 'bold', cursor: 'pointer', marginLeft: 'auto', fontFamily: 'Nunito, Noto Sans TC, sans-serif' }}
           >
             修改本週期
           </button>
         </div>
 
         <div style={circularChartContainerStyle}>
-          <div
-            style={{
-              ...circularChartStyle,
-              background: `conic-gradient(${currentPhase.color} ${progressPercent}%, #f9f9f9 ${progressPercent}%)`,
-            }}
-          >
+          <div style={{ ...circularChartStyle, background: `conic-gradient(${currentPhase.color} ${progressPercent}%, #f9f9f9 ${progressPercent}%)` }}>
             <div style={circularChartInnerStyle}>
               <div style={{ fontSize: '0.9rem', color: '#888' }}>Cycle Day</div>
-              <div
-                style={{
-                  fontSize: '2.8rem',
-                  fontWeight: 'bold',
-                  color: '#4a4a4a',
-                  lineHeight: 1,
-                  fontFamily: 'Nunito, sans-serif'
-                }}
-              >
-                {daysPassed}
-              </div>
+              <div style={{ fontSize: '2.8rem', fontWeight: 'bold', color: '#4a4a4a', lineHeight: 1, fontFamily: 'Nunito, sans-serif' }}>{daysPassed}</div>
             </div>
           </div>
-
           <div style={statusTextStyle}>
-            <div
-              style={{
-                color: currentPhase.accent,
-                fontWeight: 'bold',
-                fontSize: '1.2rem',
-              }}
-            >
-              {currentPhase.name}
-            </div>
-            <div style={{ color: '#888', fontSize: '0.9rem', marginTop: '4px' }}>
-              {currentPhase.hormone}
-            </div>
-            <div style={{ 
-                marginTop: '8px', 
-                fontSize: '0.85rem', 
-                color: '#555', 
-                backgroundColor: currentPhase.lightColor,
-                padding: '8px',
-                borderRadius: '8px',
-                border: `1px dashed ${currentPhase.color}`,
-                lineHeight: '1.4'
-            }}>
+            <div style={{ color: currentPhase.accent, fontWeight: 'bold', fontSize: '1.2rem' }}>{currentPhase.name}</div>
+            <div style={{ color: '#888', fontSize: '0.9rem', marginTop: '4px' }}>{currentPhase.hormone}</div>
+            <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#555', backgroundColor: currentPhase.lightColor, padding: '8px', borderRadius: '8px', border: `1px dashed ${currentPhase.color}`, lineHeight: '1.4' }}>
                 💡 {currentPhase.tips}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 📉 週期趨勢分析 (解決重疊、字體優化) */}
-      <div style={{ ...cardStyle, marginTop: '20px', padding: '15px 15px 25px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h3 style={{ ...cardTitleStyle, marginBottom: 0, borderBottom: 'none' }}>📉 週期趨勢分析</h3>
-            <div style={{ fontSize: '0.75rem', color: '#999', display: 'flex', gap: '10px' }}>
-                <span style={{ color: '#F49B00', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'3px'}}>●</span>食慾</span>
-                <span style={{ color: '#896CD9', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'3px'}}>●</span>壓力</span>
-                <span style={{ color: '#29B6F6', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'3px', borderBottom:'2px dashed #29B6F6'}}>●</span>水腫</span>
-            </div>
-        </div>
+      {/* 📉 週期趨勢分析 (分層軌道設計) */}
+      <div style={{ ...cardStyle, marginTop: '20px', padding: '20px 15px' }}>
+        <h3 style={{ ...cardTitleStyle, marginBottom: '15px', borderBottom: 'none' }}>📉 週期趨勢分析</h3>
         
-        <div style={{ position: 'relative', height: '140px', marginTop: '5px' }}>
-            <svg viewBox="0 0 340 140" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
-                <line x1="0" y1="35" x2="340" y2="35" stroke="#f5f5f5" strokeWidth="1" />
-                <line x1="0" y1="70" x2="340" y2="70" stroke="#f5f5f5" strokeWidth="1" />
-                <line x1="0" y1="105" x2="340" y2="105" stroke="#f5f5f5" strokeWidth="1" />
+        {/* SVG Container */}
+        <div style={{ position: 'relative', height: '180px' }}>
+            <svg viewBox="0 0 340 180" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
                 
-                {/* Appetite (Orange) - Solid */}
-                <polyline 
-                    points={getCurvePoints(340, 140, 'appetite')} 
-                    fill="none" 
-                    stroke="#F49B00" 
-                    strokeWidth="2.5" 
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                />
-                
-                {/* Hormone/Mood (Purple) - Dotted */}
-                <polyline 
-                    points={getCurvePoints(340, 140, 'hormone')} 
-                    fill="none" 
-                    stroke="#896CD9" 
-                    strokeWidth="2" 
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeDasharray="3,3"
-                    opacity="0.8"
-                />
+                {/* 軌道 1: 食慾 (Top) */}
+                <text x="0" y="20" fontSize="10" fill="#F49B00" fontWeight="bold">● 食慾</text>
+                <line x1="40" y1="55" x2="340" y2="55" stroke="#eee" strokeWidth="1" />
+                <polyline points={getTrackPoints(300, 55, 'appetite', 0).split(' ').map(p => {const [x,y] = p.split(','); return `${parseFloat(x)+40},${y}`}).join(' ')} fill="none" stroke="#F49B00" strokeWidth="2.5" strokeLinecap="round" />
 
-                {/* Edema (Blue) - Dashed */}
-                <polyline 
-                    points={getCurvePoints(340, 140, 'edema')} 
-                    fill="none" 
-                    stroke="#29B6F6" 
-                    strokeWidth="2.5" 
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeDasharray="6,4"
-                />
+                {/* 軌道 2: 壓力 (Middle) */}
+                <text x="0" y="80" fontSize="10" fill="#896CD9" fontWeight="bold">● 壓力</text>
+                <line x1="40" y1="115" x2="340" y2="115" stroke="#eee" strokeWidth="1" />
+                <polyline points={getTrackPoints(300, 55, 'hormone', 60).split(' ').map(p => {const [x,y] = p.split(','); return `${parseFloat(x)+40},${y}`}).join(' ')} fill="none" stroke="#896CD9" strokeWidth="2.5" strokeLinecap="round" />
 
-                {/* Today Line */}
+                {/* 軌道 3: 水腫 (Bottom) */}
+                <text x="0" y="140" fontSize="10" fill="#29B6F6" fontWeight="bold">● 水腫</text>
+                <line x1="40" y1="175" x2="340" y2="175" stroke="#eee" strokeWidth="1" />
+                <polyline points={getTrackPoints(300, 55, 'edema', 120).split(' ').map(p => {const [x,y] = p.split(','); return `${parseFloat(x)+40},${y}`}).join(' ')} fill="none" stroke="#29B6F6" strokeWidth="2.5" strokeLinecap="round" />
+
+                {/* 今天指標線 (貫穿三軌) */}
                 <line 
-                    x1={(daysPassed / 34) * 340} y1="0" 
-                    x2={(daysPassed / 34) * 340} y2="140" 
+                    x1={(daysPassed / 34) * 300 + 40} y1="0" 
+                    x2={(daysPassed / 34) * 300 + 40} y2="180" 
                     stroke="#333" strokeWidth="1.5" strokeDasharray="4,2"
                 />
-
-                {/* Day 25: Appetite & Edema Rise (Combined) */}
-                <line 
-                    x1={(24 / 34) * 340} y1="5" 
-                    x2={(24 / 34) * 340} y2="140" 
-                    stroke="#999" strokeWidth="1" strokeDasharray="2,2" opacity="0.3"
-                />
-                <text x={(24 / 34) * 340} y="0" fill="#666" fontSize="10" fontWeight="bold" textAnchor="middle" style={{fontFamily: 'Nunito, Noto Sans TC, sans-serif'}}>
-                    {day25Str} 食慾/水腫↑
-                </text>
-
-                {/* Day 28: Stress Rise (Low Label) */}
-                <line 
-                    x1={(27 / 34) * 340} y1="40" 
-                    x2={(27 / 34) * 340} y2="140" 
-                    stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"
-                />
-                <text x={(27 / 34) * 340} y="35" fill="#896CD9" fontSize="10" fontWeight="bold" textAnchor="middle" style={{fontFamily: 'Nunito, Noto Sans TC, sans-serif'}}>
-                    {day28Str} 壓力↑
-                </text>
-
-                {/* Day 30: Peak (All) (High Label) */}
-                <line 
-                    x1={(29 / 34) * 340} y1="5" 
-                    x2={(29 / 34) * 340} y2="140" 
-                    stroke="#D6336C" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"
-                />
-                <text x={(29 / 34) * 340} y="0" fill="#D6336C" fontSize="10" fontWeight="bold" textAnchor="middle" style={{fontFamily: 'Nunito, Noto Sans TC, sans-serif'}}>
-                    {day30Str} PMS高峰
-                </text>
             </svg>
             
+            {/* Today Label */}
             <div style={{ 
                 position: 'absolute', 
-                left: `calc(${(daysPassed / 34) * 100}% - 18px)`, 
+                left: `calc(${((daysPassed / 34) * 300 + 40) / 340 * 100}% - 14px)`, 
                 bottom: '-22px', 
                 backgroundColor: '#333', 
                 color: 'white', 
-                fontSize: '0.7rem', 
-                padding: '2px 6px', 
+                fontSize: '0.65rem', 
+                padding: '2px 4px', 
                 borderRadius: '4px',
                 fontWeight: 'bold',
                 zIndex: 5,
@@ -731,11 +533,25 @@ const PhoebeCycleTracker: React.FC = () => {
                 今天
             </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginTop: '28px', fontFamily:'Nunito, sans-serif' }}>
-            <span>Day 1</span>
-            <span>Day 14</span>
-            <span>Day 28</span>
-            <span>Day 34</span>
+
+        {/* 關鍵日期摘要列表 (取代圖中文字) */}
+        <div style={{ marginTop: '35px', backgroundColor: '#f9f9f9', borderRadius: '12px', padding: '12px' }}>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>📅 關鍵預警日期</h4>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '0.85rem' }}>
+                <span style={{color: '#29B6F6', fontWeight:'bold'}}>💧 水腫與食慾明顯上升</span>
+                <span>{formatShortDate(addDays(lastStartDate, edemaRiseDay - 1))} (Day 25)</span>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '0.85rem' }}>
+                <span style={{color: '#896CD9', fontWeight:'bold'}}>💜 壓力開始上升</span>
+                <span>{formatShortDate(addDays(lastStartDate, stressRiseDay - 1))} (Day 28)</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                <span style={{color: '#D6336C', fontWeight:'bold', backgroundColor:'#FFE5EC', padding:'2px 6px', borderRadius:'4px'}}>🔥 PMS 全面高峰</span>
+                <span style={{fontWeight:'bold', color: '#D6336C'}}>{formatShortDate(addDays(lastStartDate, pmsPeakDay - 1))} (Day 30)</span>
+            </div>
         </div>
       </div>
 
@@ -743,17 +559,15 @@ const PhoebeCycleTracker: React.FC = () => {
       <div style={{ ...cardStyle, marginTop: '20px' }}>
         <h3 style={cardTitleStyle}>🗓️ 週期月曆</h3>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-          <button onClick={goToPreviousMonth} style={navButtonStyle}>&lt;</button>
+          <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} style={navButtonStyle}>&lt;</button>
           <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
             {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
           </span>
-          <button onClick={goToNextMonth} style={navButtonStyle}>&gt;</button>
+          <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} style={navButtonStyle}>&gt;</button>
         </div>
 
         <div style={calendarGridStyle}>
-          {dayNames.map((n, i) => (
-            <div key={i} style={dayNameStyle}>{n}</div>
-          ))}
+          {dayNames.map((n, i) => <div key={i} style={dayNameStyle}>{n}</div>)}
           {generateCalendarDays.map((date, i) => {
             const dateStr = formatLocalDate(date);
             const phase = getPhaseForDate(date);
@@ -779,21 +593,8 @@ const PhoebeCycleTracker: React.FC = () => {
                   fontWeight: isToday ? 'bold' : 'normal'
                 }}
               >
-                <div style={{ fontSize: '0.9rem', marginBottom: '4px', fontFamily: 'Nunito, sans-serif' }}>
-                  {date.getDate()}
-                </div>
-                {phase && (
-                  <div
-                    style={{
-                      backgroundColor: phase.color,
-                      height: '4px',
-                      borderRadius: '2px',
-                      width: '70%',
-                      margin: '0 auto',
-                      marginBottom: record ? '2px' : '0',
-                    }}
-                  ></div>
-                )}
+                <div style={{ fontSize: '0.9rem', marginBottom: '4px', fontFamily: 'Nunito, sans-serif' }}>{date.getDate()}</div>
+                {phase && <div style={{ backgroundColor: phase.color, height: '4px', borderRadius: '2px', width: '70%', margin: '0 auto', marginBottom: record ? '2px' : '0' }}></div>}
                 {record && <div style={{...recordDotStyle, backgroundColor: phase?.accent}}></div>}
               </div>
             );
@@ -803,47 +604,22 @@ const PhoebeCycleTracker: React.FC = () => {
 
       {/* Prediction & Record Input */}
       <div style={gridContainerStyle}>
-        <div
-          style={{
-            ...cardStyle,
-            flex: 1,
-            padding: '20px',
-            borderTop: `4px solid ${PHASE_RULES[2].color}`,
-          }}
-        >
+        <div style={{ ...cardStyle, flex: 1, padding: '20px', borderTop: `4px solid ${PHASE_RULES[2].color}` }}>
           <h3 style={cardTitleStyle}>🔮 下次預測</h3>
           <div style={{ marginBottom: '12px' }}>
             <div style={predictionLabelStyle}>下次 PMS 高峰：</div>
-            <strong style={{ ...predictionDateStyle, color: PHASE_RULES[4].accent }}>
-              {nextPMSDate}
-            </strong>
+            <strong style={{ ...predictionDateStyle, color: PHASE_RULES[4].accent }}>{nextPMSDate}</strong>
           </div>
           <div>
             <div style={predictionLabelStyle}>下次生理期預計：</div>
-            <strong style={{ ...predictionDateStyle, color: PHASE_RULES[0].accent }}>
-              {nextPeriodDate}
-            </strong>
+            <strong style={{ ...predictionDateStyle, color: PHASE_RULES[0].accent }}>{nextPeriodDate}</strong>
           </div>
         </div>
 
-        <div
-          style={{
-            ...cardStyle,
-            flex: 1,
-            padding: '20px',
-            borderTop: `4px solid ${PHASE_RULES[1].color}`,
-          }}
-        >
+        <div style={{ ...cardStyle, flex: 1, padding: '20px', borderTop: `4px solid ${PHASE_RULES[1].color}` }}>
           <h3 style={cardTitleStyle}>這次生理期第一天</h3>
-          <input
-            type="date"
-            value={inputDate}
-            onChange={(e) => setInputDate(e.target.value)}
-            style={inputStyle}
-          />
-          <button onClick={handleUpsertPeriodRecord} style={recordButtonStyle}>
-            確認日期
-          </button>
+          <input type="date" value={inputDate} onChange={(e) => setInputDate(e.target.value)} style={inputStyle} />
+          <button onClick={handleUpsertPeriodRecord} style={recordButtonStyle}>確認日期</button>
         </div>
       </div>
 
@@ -852,19 +628,12 @@ const PhoebeCycleTracker: React.FC = () => {
         <div style={cardStyle}>
           <h3 style={cardTitleStyle}>🌡️ 身體症狀與食慾</h3>
           <ul style={listListStyle}>
-            {[...currentPhase.symptoms, ...currentPhase.diet].map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
+            {[...currentPhase.symptoms, ...currentPhase.diet].map((s, i) => <li key={i}>{s}</li>)}
           </ul>
         </div>
-
         <div style={{ ...cardStyle, border: `2px solid ${currentPhase.lightColor}` }}>
           <h3 style={{ ...cardTitleStyle, color: currentPhase.color }}>💖 照顧方式</h3>
-          <ul style={listListStyle}>
-            {currentPhase.care.map((c, i) => (
-              <li key={i}>{c}</li>
-            ))}
-          </ul>
+          <ul style={listListStyle}>{currentPhase.care.map((c, i) => <li key={i}>{c}</li>)}</ul>
         </div>
       </div>
 
@@ -885,12 +654,7 @@ const PhoebeCycleTracker: React.FC = () => {
               
               <div style={{ marginTop: '10px' }}>
                 <label style={{ display: 'block', fontSize: '0.9rem', color: '#555' }}>備註：</label>
-                <textarea
-                  value={currentRecord.notes}
-                  onChange={e => setCurrentRecord({...currentRecord, notes: e.target.value})}
-                  rows={2}
-                  style={inputStyle}
-                />
+                <textarea value={currentRecord.notes} onChange={e => setCurrentRecord({...currentRecord, notes: e.target.value})} rows={2} style={inputStyle} />
               </div>
             </div>
 
@@ -907,13 +671,10 @@ const PhoebeCycleTracker: React.FC = () => {
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
             <h3 style={{ color: PHASE_RULES[3].accent }}>📅 修改本次週期</h3>
-            
             <label style={{display: 'block', margin: '10px 0'}}>開始日期：</label>
             <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={inputStyle} />
-            
             <label style={{display: 'block', margin: '15px 0 5px'}}>生理期出血天數：</label>
             <input type="number" value={editBleedingDays} onChange={e => setEditBleedingDays(parseInt(e.target.value) || 6)} min={3} max={10} style={inputStyle} />
-
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button onClick={() => setEditMode(false)} style={{ ...baseButtonStyle, backgroundColor: '#ccc' }}>取消</button>
               <button onClick={handleSaveEdit} style={{ ...baseButtonStyle, backgroundColor: PHASE_RULES[3].accent }}>儲存</button>
@@ -925,35 +686,17 @@ const PhoebeCycleTracker: React.FC = () => {
   );
 };
 
-// --- Subcomponents ---
-
+// --- Subcomponents & Styles ---
 const RecordDropdown: React.FC<{ label: string; options: string[]; value: string; onChange: (v: string) => void }> = ({ label, options, value, onChange }) => (
   <div style={{ marginBottom: '10px' }}>
     <label style={{ fontSize: '0.9rem', color: '#666' }}>{label}: </label>
     <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
       {options.map(op => (
-        <button
-          key={op}
-          onClick={() => onChange(value === op ? '' : op)}
-          style={{
-            padding: '5px 10px',
-            borderRadius: '15px',
-            border: '1px solid #ddd',
-            fontSize: '0.85rem',
-            cursor: 'pointer',
-            backgroundColor: value === op ? '#896CD9' : '#f9f9f9',
-            color: value === op ? 'white' : '#555',
-            fontFamily: 'Noto Sans TC, sans-serif'
-          }}
-        >
-          {op}
-        </button>
+        <button key={op} onClick={() => onChange(value === op ? '' : op)} style={{ padding: '5px 10px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '0.85rem', cursor: 'pointer', backgroundColor: value === op ? '#896CD9' : '#f9f9f9', color: value === op ? 'white' : '#555', fontFamily: 'Noto Sans TC, sans-serif' }}>{op}</button>
       ))}
     </div>
   </div>
 );
-
-// --- Styles ---
 
 const appContainerStyle: React.CSSProperties = { maxWidth: '600px', margin: '0 auto', padding: '0 20px 40px', fontFamily: 'Noto Sans TC, sans-serif', backgroundColor: '#faf9f6', minHeight: '100vh', letterSpacing: '0.02em' };
 const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 0', marginBottom: '10px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' };
@@ -982,6 +725,5 @@ const listListStyle: React.CSSProperties = { paddingLeft: '20px', lineHeight: '1
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
 const modalContentStyle: React.CSSProperties = { backgroundColor: 'white', padding: '25px', borderRadius: '16px', maxWidth: '90%' };
 const baseButtonStyle: React.CSSProperties = { flex: 1, padding: '10px', border: 'none', borderRadius: '8px', color: 'white', fontSize: '1rem', cursor: 'pointer' };
-const symptomRecordBoxStyle: React.CSSProperties = { marginTop: '20px' };
 
 export default PhoebeCycleTracker;
