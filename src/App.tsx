@@ -139,9 +139,9 @@ const formatLocalDate = (date: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
-const getDaysDifference = (date1Str: string, date2Str: string): number => {
-  const d1 = parseLocalDate(date1Str);
-  const d2 = parseLocalDate(date2Str);
+const getDaysDifference = (date1: string, date2: string): number => {
+  const d1 = parseLocalDate(date1);
+  const d2 = parseLocalDate(date2);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
@@ -151,6 +151,7 @@ const addDays = (dateStr: string, days: number): string => {
   return formatLocalDate(d);
 };
 
+// 簡化版日期顯示 (MM/DD)
 const formatShortDate = (dateStr: string): string => {
   return dateStr.slice(5).replace('-', '/');
 };
@@ -390,49 +391,44 @@ const PhoebeCycleTracker: React.FC = () => {
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
 
-  // --- 分層曲線圖邏輯 (Separated Tracks) ---
-  const getTrackPoints = (width: number, rowHeight: number, type: 'appetite' | 'hormone' | 'edema', offsetY: number) => {
+  // --- 曲線圖邏輯 (Overlaid) ---
+  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {
     const points: string[] = [];
     const totalDays = 34; 
     const stepX = width / totalDays;
     
     for (let day = 1; day <= totalDays; day++) {
-        let intensity = 0; // 0=Low, 1=High
+        let intensity = 50; 
         
-        if (type === 'appetite') { // 食慾：PMS高, 濾泡低
-            if (day <= 6) intensity = 0.4;
-            else if (day <= 24) intensity = 0.1;
-            else if (day <= 27) intensity = 0.5;
-            else if (day <= 29) intensity = 0.6;
-            else intensity = 0.9;
-        } else if (type === 'hormone') { // 壓力：PMS不穩
-            if (day <= 14) intensity = 0.2;
-            else if (day <= 24) intensity = 0.4;
-            else if (day <= 28) intensity = 0.6; // 壓力開始上升
-            else intensity = 0.85;
-        } else if (type === 'edema') { // 水腫：PMS最腫
-            if (day <= 3) intensity = 0.6;
-            else if (day <= 6) intensity = 0.3;
-            else if (day <= 24) intensity = 0.05;
-            else if (day <= 27) intensity = 0.4;
-            else if (day <= 29) intensity = 0.6;
-            else intensity = 0.9;
+        // 視覺分離：食慾(中)，壓力(上)，水腫(下) 微調
+        if (type === 'appetite') {
+            if (day <= 6) intensity = 60 + 2;
+            else if (day <= 24) intensity = 90 + 2;
+            else if (day <= 27) intensity = 50 + 2;
+            else if (day <= 29) intensity = 40 + 2;
+            else intensity = 10 + 2;
+        } else if (type === 'hormone') {
+            if (day <= 14) intensity = 80;
+            else if (day <= 24) intensity = 40;
+            else if (day <= 28) intensity = 20;
+            else intensity = 85;
+        } else if (type === 'edema') {
+            if (day <= 3) intensity = 40 - 2;
+            else if (day <= 6) intensity = 70 - 2;
+            else if (day <= 24) intensity = 95 - 2;
+            else if (day <= 27) intensity = 60 - 2;
+            else if (day <= 29) intensity = 40 - 2;
+            else intensity = 10 - 2;
         }
         
-        // 轉換為 Y 座標 (反轉：1=Top, 0=Bottom within row)
-        // Row Top = offsetY, Row Bottom = offsetY + rowHeight
-        // intensity 1 => Top (y = offsetY + padding)
-        // intensity 0 => Bottom (y = offsetY + rowHeight - padding)
-        const padding = 5;
-        const h = rowHeight - (padding * 2);
-        const y = (offsetY + rowHeight - padding) - (intensity * h);
         const x = (day - 1) * stepX;
+        const y = (intensity / 100) * height;
         points.push(`${x},${y}`);
     }
     return points.join(' ');
   };
 
-  // 關鍵日期計算
+  // 關鍵日期
   const edemaRiseDay = 25;
   const stressRiseDay = 28;
   const pmsPeakDay = 30;
@@ -485,72 +481,73 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* 📉 週期趨勢分析 (分層軌道設計) */}
+      {/* 📉 週期趨勢分析 (Overlay Style + Summary) */}
       <div style={{ ...cardStyle, marginTop: '20px', padding: '20px 15px' }}>
-        <h3 style={{ ...cardTitleStyle, marginBottom: '15px', borderBottom: 'none' }}>📉 週期趨勢分析</h3>
-        
-        {/* SVG Container */}
-        <div style={{ position: 'relative', height: '180px' }}>
-            <svg viewBox="0 0 340 180" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
-                
-                {/* 軌道 1: 食慾 (Top) */}
-                <text x="0" y="20" fontSize="10" fill="#F49B00" fontWeight="bold">● 食慾</text>
-                <line x1="40" y1="55" x2="340" y2="55" stroke="#eee" strokeWidth="1" />
-                <polyline points={getTrackPoints(300, 55, 'appetite', 0).split(' ').map(p => {const [x,y] = p.split(','); return `${parseFloat(x)+40},${y}`}).join(' ')} fill="none" stroke="#F49B00" strokeWidth="2.5" strokeLinecap="round" />
-
-                {/* 軌道 2: 壓力 (Middle) */}
-                <text x="0" y="80" fontSize="10" fill="#896CD9" fontWeight="bold">● 壓力</text>
-                <line x1="40" y1="115" x2="340" y2="115" stroke="#eee" strokeWidth="1" />
-                <polyline points={getTrackPoints(300, 55, 'hormone', 60).split(' ').map(p => {const [x,y] = p.split(','); return `${parseFloat(x)+40},${y}`}).join(' ')} fill="none" stroke="#896CD9" strokeWidth="2.5" strokeLinecap="round" />
-
-                {/* 軌道 3: 水腫 (Bottom) */}
-                <text x="0" y="140" fontSize="10" fill="#29B6F6" fontWeight="bold">● 水腫</text>
-                <line x1="40" y1="175" x2="340" y2="175" stroke="#eee" strokeWidth="1" />
-                <polyline points={getTrackPoints(300, 55, 'edema', 120).split(' ').map(p => {const [x,y] = p.split(','); return `${parseFloat(x)+40},${y}`}).join(' ')} fill="none" stroke="#29B6F6" strokeWidth="2.5" strokeLinecap="round" />
-
-                {/* 今天指標線 (貫穿三軌) */}
-                <line 
-                    x1={(daysPassed / 34) * 300 + 40} y1="0" 
-                    x2={(daysPassed / 34) * 300 + 40} y2="180" 
-                    stroke="#333" strokeWidth="1.5" strokeDasharray="4,2"
-                />
-            </svg>
-            
-            {/* Today Label */}
-            <div style={{ 
-                position: 'absolute', 
-                left: `calc(${((daysPassed / 34) * 300 + 40) / 340 * 100}% - 14px)`, 
-                bottom: '-22px', 
-                backgroundColor: '#333', 
-                color: 'white', 
-                fontSize: '0.65rem', 
-                padding: '2px 4px', 
-                borderRadius: '4px',
-                fontWeight: 'bold',
-                zIndex: 5,
-                fontFamily: 'Noto Sans TC, sans-serif'
-            }}>
-                今天
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h3 style={{ ...cardTitleStyle, marginBottom: 0, borderBottom: 'none' }}>📉 週期趨勢分析</h3>
+            {/* Legend 放在標題旁 */}
+            <div style={{ fontSize: '0.75rem', color: '#999', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ color: '#F49B00', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'2px'}}>●</span>食慾</span>
+                <span style={{ color: '#896CD9', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'2px'}}>●</span>壓力</span>
+                <span style={{ color: '#29B6F6', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'2px'}}>●</span>水腫</span>
             </div>
         </div>
+        
+        {/* SVG Chart */}
+        <div style={{ position: 'relative', height: '140px' }}>
+            <svg viewBox="0 0 340 140" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
+                {/* Grid Lines */}
+                <line x1="0" y1="35" x2="340" y2="35" stroke="#f5f5f5" strokeWidth="1" />
+                <line x1="0" y1="70" x2="340" y2="70" stroke="#f5f5f5" strokeWidth="1" />
+                <line x1="0" y1="105" x2="340" y2="105" stroke="#f5f5f5" strokeWidth="1" />
+                
+                {/* Appetite (Orange) - Solid */}
+                <polyline points={getCurvePoints(340, 140, 'appetite')} fill="none" stroke="#F49B00" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                
+                {/* Hormone/Mood (Purple) - Dotted */}
+                <polyline points={getCurvePoints(340, 140, 'hormone')} fill="none" stroke="#896CD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="3,3" opacity="0.8" />
 
-        {/* 關鍵日期摘要列表 (取代圖中文字) */}
-        <div style={{ marginTop: '35px', backgroundColor: '#f9f9f9', borderRadius: '12px', padding: '12px' }}>
-            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>📅 關鍵預警日期</h4>
+                {/* Edema (Blue) - Dashed */}
+                <polyline points={getCurvePoints(340, 140, 'edema')} fill="none" stroke="#29B6F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6,4" />
+
+                {/* Today Line */}
+                <line x1={(daysPassed / 34) * 340} y1="0" x2={(daysPassed / 34) * 340} y2="140" stroke="#333" strokeWidth="1.5" strokeDasharray="4,2" />
+                
+                {/* 關鍵日標記線 (僅線條) */}
+                <line x1={((edemaRiseDay-1) / 34) * 340} y1="0" x2={((edemaRiseDay-1) / 34) * 340} y2="140" stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
+                <line x1={((stressRiseDay-1) / 34) * 340} y1="0" x2={((stressRiseDay-1) / 34) * 340} y2="140" stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
+                <line x1={((pmsPeakDay-1) / 34) * 340} y1="0" x2={((pmsPeakDay-1) / 34) * 340} y2="140" stroke="#D6336C" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
+
+            </svg>
+            {/* Today Label */}
+            <div style={{ position: 'absolute', left: `calc(${(daysPassed / 34) * 100}% - 14px)`, bottom: '-22px', backgroundColor: '#333', color: 'white', fontSize: '0.65rem', padding: '2px 4px', borderRadius: '4px', fontWeight: 'bold', zIndex: 5, fontFamily: 'Noto Sans TC, sans-serif' }}>今天</div>
+        </div>
+
+        {/* X-Axis Labels */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginTop: '28px', fontFamily:'Nunito, sans-serif' }}>
+            <span>Day 1</span>
+            <span>Day 14</span>
+            <span>Day 28</span>
+            <span>Day 34</span>
+        </div>
+
+        {/* 關鍵日期摘要列表 (Summary Block) */}
+        <div style={{ marginTop: '20px', backgroundColor: '#fdfdfd', borderRadius: '12px', padding: '12px', border: '1px solid #f0f0f0' }}>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>📅 關鍵預測日期</h4>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '0.85rem' }}>
                 <span style={{color: '#29B6F6', fontWeight:'bold'}}>💧 水腫與食慾明顯上升</span>
-                <span>{formatShortDate(addDays(lastStartDate, edemaRiseDay - 1))} (Day 25)</span>
+                <span style={{fontFamily:'Nunito, sans-serif'}}>{formatShortDate(addDays(lastStartDate, edemaRiseDay - 1))} (Day 25)</span>
             </div>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '0.85rem' }}>
-                <span style={{color: '#896CD9', fontWeight:'bold'}}>💜 壓力開始上升</span>
-                <span>{formatShortDate(addDays(lastStartDate, stressRiseDay - 1))} (Day 28)</span>
+                <span style={{color: '#896CD9', fontWeight:'bold'}}>💜 壓力開始明顯上升</span>
+                <span style={{fontFamily:'Nunito, sans-serif'}}>{formatShortDate(addDays(lastStartDate, stressRiseDay - 1))} (Day 28)</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                <span style={{color: '#D6336C', fontWeight:'bold', backgroundColor:'#FFE5EC', padding:'2px 6px', borderRadius:'4px'}}>🔥 PMS 全面高峰</span>
-                <span style={{fontWeight:'bold', color: '#D6336C'}}>{formatShortDate(addDays(lastStartDate, pmsPeakDay - 1))} (Day 30)</span>
+                <span style={{color: '#D6336C', fontWeight:'bold', backgroundColor:'#FFE5EC', padding:'2px 6px', borderRadius:'4px'}}>🔥 PMS 全面高峰 (同時)</span>
+                <span style={{fontFamily:'Nunito, sans-serif', fontWeight:'bold', color: '#D6336C'}}>{formatShortDate(addDays(lastStartDate, pmsPeakDay - 1))} (Day 30)</span>
             </div>
         </div>
       </div>
@@ -725,5 +722,6 @@ const listListStyle: React.CSSProperties = { paddingLeft: '20px', lineHeight: '1
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
 const modalContentStyle: React.CSSProperties = { backgroundColor: 'white', padding: '25px', borderRadius: '16px', maxWidth: '90%' };
 const baseButtonStyle: React.CSSProperties = { flex: 1, padding: '10px', border: 'none', borderRadius: '8px', color: 'white', fontSize: '1rem', cursor: 'pointer' };
+const symptomRecordBoxStyle: React.CSSProperties = { marginTop: '20px' };
 
 export default PhoebeCycleTracker;
