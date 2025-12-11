@@ -151,7 +151,6 @@ const addDays = (dateStr: string, days: number): string => {
   return formatLocalDate(d);
 };
 
-// 簡化版日期顯示 (MM/DD)
 const formatShortDate = (dateStr: string): string => {
   return dateStr.slice(5).replace('-', '/');
 };
@@ -391,7 +390,7 @@ const PhoebeCycleTracker: React.FC = () => {
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
 
-  // --- 曲線圖邏輯 (Overlaid) ---
+  // --- 曲線圖邏輯 (Overlaid Chart) ---
   const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {
     const points: string[] = [];
     const totalDays = 34; 
@@ -400,7 +399,7 @@ const PhoebeCycleTracker: React.FC = () => {
     for (let day = 1; day <= totalDays; day++) {
         let intensity = 50; 
         
-        // 視覺分離：食慾(中)，壓力(上)，水腫(下) 微調
+        // 視覺分離：食慾(中)，壓力(上)，水腫(下) 微調，避免完全重疊
         if (type === 'appetite') {
             if (day <= 6) intensity = 60 + 2;
             else if (day <= 24) intensity = 90 + 2;
@@ -481,11 +480,10 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* 📉 週期趨勢分析 (Overlay Style + Summary) */}
+      {/* 📉 週期趨勢分析 (Overlaid Chart + Summary Block) */}
       <div style={{ ...cardStyle, marginTop: '20px', padding: '20px 15px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h3 style={{ ...cardTitleStyle, marginBottom: 0, borderBottom: 'none' }}>📉 週期趨勢分析</h3>
-            {/* Legend 放在標題旁 */}
             <div style={{ fontSize: '0.75rem', color: '#999', display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <span style={{ color: '#F49B00', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'2px'}}>●</span>食慾</span>
                 <span style={{ color: '#896CD9', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'2px'}}>●</span>壓力</span>
@@ -513,11 +511,10 @@ const PhoebeCycleTracker: React.FC = () => {
                 {/* Today Line */}
                 <line x1={(daysPassed / 34) * 340} y1="0" x2={(daysPassed / 34) * 340} y2="140" stroke="#333" strokeWidth="1.5" strokeDasharray="4,2" />
                 
-                {/* 關鍵日標記線 (僅線條) */}
+                {/* 關鍵日標記線 (僅線條，無文字) */}
                 <line x1={((edemaRiseDay-1) / 34) * 340} y1="0" x2={((edemaRiseDay-1) / 34) * 340} y2="140" stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
                 <line x1={((stressRiseDay-1) / 34) * 340} y1="0" x2={((stressRiseDay-1) / 34) * 340} y2="140" stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
                 <line x1={((pmsPeakDay-1) / 34) * 340} y1="0" x2={((pmsPeakDay-1) / 34) * 340} y2="140" stroke="#D6336C" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
-
             </svg>
             {/* Today Label */}
             <div style={{ position: 'absolute', left: `calc(${(daysPassed / 34) * 100}% - 14px)`, bottom: '-22px', backgroundColor: '#333', color: 'white', fontSize: '0.65rem', padding: '2px 4px', borderRadius: '4px', fontWeight: 'bold', zIndex: 5, fontFamily: 'Noto Sans TC, sans-serif' }}>今天</div>
@@ -722,6 +719,5 @@ const listListStyle: React.CSSProperties = { paddingLeft: '20px', lineHeight: '1
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
 const modalContentStyle: React.CSSProperties = { backgroundColor: 'white', padding: '25px', borderRadius: '16px', maxWidth: '90%' };
 const baseButtonStyle: React.CSSProperties = { flex: 1, padding: '10px', border: 'none', borderRadius: '8px', color: 'white', fontSize: '1rem', cursor: 'pointer' };
-const symptomRecordBoxStyle: React.CSSProperties = { marginTop: '20px' };
 
 export default PhoebeCycleTracker;
