@@ -19,9 +19,9 @@ interface PhaseDefinition {
 
 interface CycleRecord {
   id: string;
-  startDate: string; 
-  length: number | null; 
-  periodLength?: number; 
+  startDate: string; // "YYYY-MM-DD"
+  length: number | null; // 週期長度
+  periodLength?: number; // 生理期出血天數
 }
 
 interface SymptomRecord {
@@ -44,7 +44,7 @@ interface DateDetail {
 
 const INITIAL_HISTORY: CycleRecord[] = [
   { id: '1', startDate: '2025-11-05', length: 34, periodLength: 6 },
-  { id: '2', startDate: '2025-12-09', length: null, periodLength: 6 },
+  { id: '2', startDate: '2025-12-10', length: null, periodLength: 6 },
 ];
 
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
@@ -157,8 +157,10 @@ const formatLocalDate = (date: Date): string => {
 };
 
 const getDaysDifference = (date1: string, date2: string): number => {
-  const d1 = parseLocalDate(date1);
-  const d2 = parseLocalDate(date2);
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  d1.setHours(0,0,0,0);
+  d2.setHours(0,0,0,0);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
@@ -168,6 +170,7 @@ const addDays = (dateStr: string, days: number): string => {
   return formatLocalDate(r);
 };
 
+// 簡化版日期顯示 (MM/DD)
 const formatShortDate = (dateStr: string): string => {
     return dateStr.slice(5).replace('-', '/');
 };
@@ -506,7 +509,6 @@ const PhoebeCycleTracker: React.FC = () => {
             else if (day <= 28) intensity = 20;
             else intensity = 85;
         } else if (type === 'edema') {
-            // 水腫曲線：PMS(30-34)最嚴重(10)，生理期初(1-3)次嚴重(40)，濾泡期(7-24)最輕盈(95)
             if (day <= 3) intensity = 40 - 3;
             else if (day <= 6) intensity = 70 - 3;
             else if (day <= 24) intensity = 95 - 3;
@@ -522,10 +524,13 @@ const PhoebeCycleTracker: React.FC = () => {
     return points.join(' ');
   };
 
-  const edemaRiseDay = 25;
-  const stressRiseDay = 28;
-  const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
-  const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
+  // 計算關鍵日期 (從 Day 1 開始推算)
+  // Day 25: 水腫 & 食慾上升 (Combined)
+  // Day 28: 壓力上升 (Independent)
+  // Day 30: 高峰 (All)
+  const day25Str = formatShortDate(addDays(lastStartDate, 24));
+  const day28Str = formatShortDate(addDays(lastStartDate, 27));
+  const day30Str = formatShortDate(addDays(lastStartDate, 29));
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -679,24 +684,34 @@ const PhoebeCycleTracker: React.FC = () => {
                     stroke="#333" strokeWidth="1.5" strokeDasharray="4,2"
                 />
 
-                {/* Edema Rise Marker (High label) */}
+                {/* Day 25: Appetite & Edema Rise (Combined) */}
                 <line 
-                    x1={((edemaRiseDay-1) / 34) * 340} y1="5" 
-                    x2={((edemaRiseDay-1) / 34) * 340} y2="140" 
-                    stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"
+                    x1={(24 / 34) * 340} y1="5" 
+                    x2={(24 / 34) * 340} y2="140" 
+                    stroke="#999" strokeWidth="1" strokeDasharray="2,2" opacity="0.3"
                 />
-                <text x={((edemaRiseDay-1) / 34) * 340} y="0" fill="#29B6F6" fontSize="10" fontWeight="bold" textAnchor="middle" style={{fontFamily: 'Nunito, sans-serif'}}>
-                    {edemaRiseDateStr} 水腫↑
+                <text x={(24 / 34) * 340} y="0" fill="#666" fontSize="10" fontWeight="bold" textAnchor="middle" style={{fontFamily: 'Nunito, Noto Sans TC, sans-serif'}}>
+                    {day25Str} 食慾/水腫↑
                 </text>
 
-                 {/* Stress Rise Marker (Low label) */}
-                 <line 
-                    x1={((stressRiseDay-1) / 34) * 340} y1="40" 
-                    x2={((stressRiseDay-1) / 34) * 340} y2="140" 
+                {/* Day 28: Stress Rise (Low Label) */}
+                <line 
+                    x1={(27 / 34) * 340} y1="40" 
+                    x2={(27 / 34) * 340} y2="140" 
                     stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"
                 />
-                <text x={((stressRiseDay-1) / 34) * 340} y="35" fill="#896CD9" fontSize="10" fontWeight="bold" textAnchor="middle" style={{fontFamily: 'Nunito, sans-serif'}}>
-                    {stressRiseDateStr} 壓力↑
+                <text x={(27 / 34) * 340} y="35" fill="#896CD9" fontSize="10" fontWeight="bold" textAnchor="middle" style={{fontFamily: 'Nunito, Noto Sans TC, sans-serif'}}>
+                    {day28Str} 壓力↑
+                </text>
+
+                {/* Day 30: Peak (All) (High Label) */}
+                <line 
+                    x1={(29 / 34) * 340} y1="5" 
+                    x2={(29 / 34) * 340} y2="140" 
+                    stroke="#D6336C" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"
+                />
+                <text x={(29 / 34) * 340} y="0" fill="#D6336C" fontSize="10" fontWeight="bold" textAnchor="middle" style={{fontFamily: 'Nunito, Noto Sans TC, sans-serif'}}>
+                    {day30Str} PMS高峰
                 </text>
             </svg>
             
@@ -710,15 +725,16 @@ const PhoebeCycleTracker: React.FC = () => {
                 padding: '2px 6px', 
                 borderRadius: '4px',
                 fontWeight: 'bold',
-                zIndex: 5
+                zIndex: 5,
+                fontFamily: 'Noto Sans TC, sans-serif'
             }}>
                 今天
             </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginTop: '28px', fontFamily:'Nunito, sans-serif' }}>
             <span>Day 1</span>
-            <span>Day 14 (排卵)</span>
-            <span>Day 28 (PMS)</span>
+            <span>Day 14</span>
+            <span>Day 28</span>
             <span>Day 34</span>
         </div>
       </div>
