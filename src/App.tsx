@@ -55,14 +55,14 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '生理期',
     startDay: 1,
     endDay: 6,
-    symptoms: ['疲倦、想休息', '偶爾子宮悶感', '心情安靜'],
+    symptoms: ['疲倦、想休息', '水腫慢慢消退中', '偶爾子宮悶感'],
     diet: ['食慾偏低/正常', '想吃冰(荷爾蒙反應)'],
     care: [
       '不逼自己運動',
       '多喝暖身飲(紅棗茶)',
       '早餐多一點蛋白質'
     ],
-    tips: '這段是妳最「穩定」的時候，適合讓身體慢慢調整。',
+    tips: '這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。',
     color: '#FF8FAB', // 溫暖粉紅
     lightColor: '#FFF0F5',
     hormone: '雌激素與黃體素低點',
@@ -72,13 +72,13 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '濾泡期 (黃金期)',
     startDay: 7,
     endDay: 24,
-    symptoms: ['精力恢復', '心情平穩', '水腫減少'],
+    symptoms: ['精力恢復', '身體最輕盈(無水腫)', '心情平穩'],
     diet: ['食慾最低', '最好控制', '飽足感良好'],
     care: [
       '適合減脂/建立習慣',
       'Zumba/伸展效果好'
     ],
-    tips: '如果妳希望建立新習慣，這段最成功！',
+    tips: '現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！',
     color: '#88D8B0', // 溫暖薄荷綠
     lightColor: '#F0FFF4',
     hormone: '雌激素逐漸上升',
@@ -88,13 +88,13 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '排卵期',
     startDay: 25,
     endDay: 27,
-    symptoms: ['下腹悶、體溫升高', '水腫慢慢回來'],
+    symptoms: ['下腹悶、體溫升高', '出現微水腫'],
     diet: ['食慾微增', '有些人想吃甜'],
     care: [
       '多喝水、多吃蔬菜',
       '補充可溶性纖維(地瓜)'
     ],
-    tips: '這段是往黃體期過渡，是身體出現變化的開始。',
+    tips: '這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。',
     color: '#FFD166', // 溫暖黃
     lightColor: '#FFFBEB',
     hormone: '黃體生成素(LH)高峰',
@@ -104,7 +104,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: '黃體期前段',
     startDay: 28,
     endDay: 29,
-    symptoms: ['較容易累', '情緒敏感'],
+    symptoms: ['較容易累', '情緒敏感', '水腫感變明顯'],
     diet: ['開始嘴饞', '想吃頻率變高'],
     care: [
       '早餐加蛋白質',
@@ -120,14 +120,14 @@ const PHASE_RULES: PhaseDefinition[] = [
     name: 'PMS 高峰',
     startDay: 30,
     endDay: 33,
-    symptoms: ['焦慮、情緒緊繃', '睡不好、水腫', '身心較沒安全感'],
+    symptoms: ['焦慮、情緒緊繃', '嚴重水腫、睡不好', '身心較沒安全感'],
     diet: ['想吃甜/冰', '正餐後仍想吃'],
     care: [
       '補充鎂(減少焦慮)',
       '允許多吃 5～10%',
       '熱茶/小毯子/深呼吸'
     ],
-    tips: '這是最辛苦的時段，請對自己特別溫柔對待。',
+    tips: '這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。',
     color: '#EF476F', // 暖洋紅
     lightColor: '#FFE5EC',
     hormone: '黃體素高峰 / 準備下降',
@@ -144,6 +144,7 @@ const SYMPTOM_OPTIONS = {
 
 // --- 3. Helper Functions ---
 
+// 強制使用瀏覽器本地時間
 const getLocalFormattedDate = (date: Date = new Date()): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -234,7 +235,6 @@ const PhoebeCycleTracker: React.FC = () => {
   const [editBleedingDays, setEditBleedingDays] = useState(6);
   const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
 
-  // 核心計算
   const currentCycle = history[history.length - 1];
   const lastStartDate = currentCycle.startDate;
   const currentPeriodLength = currentCycle.periodLength || 6;
@@ -378,8 +378,8 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const handleUpsertPeriodRecord = () => {
     if (!inputDate) return;
+    const newDateStr = inputDate; 
     const newDateObj = new Date(inputDate);
-    const newDateStr = getLocalFormattedDate(newDateObj);
 
     const existingIndex = history.findIndex(h => {
         const hDate = new Date(h.startDate);
@@ -469,31 +469,33 @@ const PhoebeCycleTracker: React.FC = () => {
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
 
-  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
-
-  // 計算曲線圖的點 (模擬 Phoebe 的典型曲線)
-  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone') => {
+  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {
     const points: string[] = [];
-    const totalDays = 34; // 預設 34 天畫滿
+    const totalDays = 34; 
     const stepX = width / totalDays;
     
     for (let day = 1; day <= totalDays; day++) {
-        let intensity = 50; // 0-100 (0=高, 100=低 - SVG 座標系)
+        let intensity = 50; // 0=High, 100=Low
         
         if (type === 'appetite') {
-            // 食慾：PMS(30-34)最高(0)，濾泡期(7-24)最低(100)，排卵期(25-27)中等(50)
-            if (day <= 6) intensity = 60; // 生理期中等
-            else if (day <= 24) intensity = 90; // 濾泡期低
-            else if (day <= 27) intensity = 50; // 排卵期升
-            else if (day <= 29) intensity = 40; // 黃體前段升
-            else intensity = 10; // PMS 高峰
-        } else {
-            // 荷爾蒙(情緒)：模擬黃體素波動
-            // 濾泡期穩(80)，排卵期高(20)，PMS低落(90)
-            if (day <= 14) intensity = 80; // 穩定期
-            else if (day <= 24) intensity = 40; // 排卵後上升
-            else if (day <= 28) intensity = 20; // 黃體高峰
-            else intensity = 85; // PMS 驟降(情緒不穩)
+            if (day <= 6) intensity = 60;
+            else if (day <= 24) intensity = 90;
+            else if (day <= 27) intensity = 50;
+            else if (day <= 29) intensity = 40;
+            else intensity = 10;
+        } else if (type === 'hormone') {
+            if (day <= 14) intensity = 80;
+            else if (day <= 24) intensity = 40;
+            else if (day <= 28) intensity = 20;
+            else intensity = 85;
+        } else if (type === 'edema') {
+            // 水腫曲線：PMS(30-34)最嚴重(10)，生理期初(1-3)次嚴重(40)，濾泡期(7-24)最輕盈(95)
+            if (day <= 3) intensity = 40;
+            else if (day <= 6) intensity = 70;
+            else if (day <= 24) intensity = 95;
+            else if (day <= 27) intensity = 60;
+            else if (day <= 29) intensity = 40;
+            else intensity = 10;
         }
         
         const x = (day - 1) * stepX;
@@ -502,6 +504,8 @@ const PhoebeCycleTracker: React.FC = () => {
     }
     return points.join(' ');
   };
+
+  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
   return (
     <div style={appContainerStyle}>
@@ -578,7 +582,7 @@ const PhoebeCycleTracker: React.FC = () => {
             <div style={{ color: '#888', fontSize: '0.9rem', marginTop: '4px' }}>
               {currentPhase.hormone}
             </div>
-            {/* 溫馨提醒放在這裡 */}
+            {/* 溫馨提醒 */}
             <div style={{ 
                 marginTop: '8px', 
                 fontSize: '0.85rem', 
@@ -594,30 +598,31 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* 📉 新增：食慾與荷爾蒙曲線圖 */}
+      {/* 📉 週期趨勢分析 (含水腫曲線) */}
       <div style={{ ...cardStyle, marginTop: '20px', padding: '15px' }}>
         <h3 style={cardTitleStyle}>📉 週期趨勢分析</h3>
         <div style={{ position: 'relative', height: '100px', marginTop: '10px', overflow: 'hidden' }}>
-            {/* 標籤 */}
+            {/* Legend */}
             <div style={{ position: 'absolute', top: 0, right: 0, fontSize: '0.7rem', color: '#999', display: 'flex', gap: '8px' }}>
                 <span style={{ color: '#F49B00' }}>● 食慾</span>
-                <span style={{ color: '#896CD9' }}>● 壓力/情緒</span>
+                <span style={{ color: '#896CD9' }}>● 壓力</span>
+                <span style={{ color: '#29B6F6' }}>● 水腫</span>
             </div>
 
             <svg viewBox="0 0 340 100" style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
-                {/* 網格線 */}
+                {/* Grid */}
                 <line x1="0" y1="50" x2="340" y2="50" stroke="#eee" strokeWidth="1" strokeDasharray="4" />
                 
-                {/* 食慾曲線 (橘色) */}
+                {/* Appetite (Orange) */}
                 <polyline 
                     points={getCurvePoints(340, 100, 'appetite')} 
                     fill="none" 
                     stroke="#F49B00" 
-                    strokeWidth="3" 
+                    strokeWidth="2.5" 
                     strokeLinecap="round"
                 />
                 
-                {/* 荷爾蒙曲線 (紫色) */}
+                {/* Hormone/Mood (Purple) */}
                 <polyline 
                     points={getCurvePoints(340, 100, 'hormone')} 
                     fill="none" 
@@ -625,10 +630,19 @@ const PhoebeCycleTracker: React.FC = () => {
                     strokeWidth="2" 
                     strokeLinecap="round"
                     strokeDasharray="4"
-                    opacity="0.7"
+                    opacity="0.6"
                 />
 
-                {/* 今天指標線 */}
+                {/* Edema (Blue) - NEW */}
+                <polyline 
+                    points={getCurvePoints(340, 100, 'edema')} 
+                    fill="none" 
+                    stroke="#29B6F6" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round"
+                />
+
+                {/* Today Line */}
                 <line 
                     x1={(daysPassed / 34) * 340} 
                     y1="0" 
@@ -640,7 +654,7 @@ const PhoebeCycleTracker: React.FC = () => {
                 />
             </svg>
             
-            {/* 今天標籤 */}
+            {/* Today Label */}
             <div style={{ 
                 position: 'absolute', 
                 left: `calc(${(daysPassed / 34) * 100}% - 15px)`, 
@@ -691,11 +705,7 @@ const PhoebeCycleTracker: React.FC = () => {
                 onClick={() => handleDateClick(date)}
                 style={{
                   ...calendarDayStyle,
-                  backgroundColor: isToday
-                    ? currentPhase.lightColor
-                    : phase
-                    ? `${phase.lightColor}90`
-                    : 'transparent',
+                  backgroundColor: phase ? phase.lightColor : 'transparent',
                   opacity: isCurrentMonth ? 1 : 0.4,
                   border: isToday 
                     ? `2px solid ${currentPhase.accent}`
@@ -703,9 +713,10 @@ const PhoebeCycleTracker: React.FC = () => {
                     ? `2px solid ${phase?.accent || '#E95A85'}`
                     : '1px solid #f5f5f5',
                   cursor: phase ? 'pointer' : 'default',
+                  fontWeight: isToday ? 'bold' : 'normal'
                 }}
               >
-                <div style={{ fontSize: '0.9rem', marginBottom: '4px', fontWeight: isToday ? 'bold' : 'normal' }}>
+                <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}>
                   {date.getDate()}
                 </div>
                 {phase && (
