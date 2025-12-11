@@ -44,7 +44,7 @@ interface DateDetail {
 
 const INITIAL_HISTORY: CycleRecord[] = [
   { id: '1', startDate: '2025-11-05', length: 34, periodLength: 6 },
-  { id: '2', startDate: '2025-12-10', length: null, periodLength: 6 }, // 假設最後一次是 12/10
+  { id: '2', startDate: '2025-12-09', length: null, periodLength: 6 },
 ];
 
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
@@ -142,33 +142,27 @@ const SYMPTOM_OPTIONS = {
   sleep: ['良好', '普通', '睡不好']
 };
 
-// --- 3. Helper Functions (TimeZone Fixed) ---
+// --- 3. Helper Functions ---
 
-// 解析 YYYY-MM-DD 為當地的 Date 物件 (午夜)
-const parseLocalDate = (dateStr: string): Date => {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
+const getLocalFormattedDate = (date: Date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
-// 將 Date 物件格式化為當地的 YYYY-MM-DD
-const formatLocalDate = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-// 計算兩個日期字串之間的天數差 (本地時間計算)
-const getDaysDifference = (date1Str: string, date2Str: string): number => {
-  const d1 = parseLocalDate(date1Str);
-  const d2 = parseLocalDate(date2Str);
+const getDaysDifference = (date1: string, date2: string): number => {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  d1.setHours(0,0,0,0);
+  d2.setHours(0,0,0,0);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
 const addDays = (dateStr: string, days: number): string => {
-  const d = parseLocalDate(dateStr);
-  d.setDate(d.getDate() + days);
-  return formatLocalDate(d);
+  const r = new Date(dateStr);
+  r.setDate(r.getDate() + days);
+  return getLocalFormattedDate(r);
 };
 
 const startOfMonth = (date: Date): Date =>
@@ -186,7 +180,6 @@ const createEmptyRecord = (date: string): SymptomRecord => ({
   notes: ''
 });
 
-// 根據出血天數動態調整規則 (Deep Clone)
 const getRulesForCycle = (periodLength: number = 6): PhaseDefinition[] => {
   const rules = JSON.parse(JSON.stringify(PHASE_RULES));
   rules[0].endDay = periodLength;
@@ -197,7 +190,6 @@ const getRulesForCycle = (periodLength: number = 6): PhaseDefinition[] => {
 // --- 4. Main Component ---
 
 const PhoebeCycleTracker: React.FC = () => {
-  // 讀取歷史紀錄
   const [history, setHistory] = useState<CycleRecord[]>(() => {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     try {
@@ -227,12 +219,11 @@ const PhoebeCycleTracker: React.FC = () => {
     localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords));
   }, [symptomRecords]);
 
-  // 使用 formatLocalDate 確保今天是本地時間
-  const [todayStr, setTodayStr] = useState(formatLocalDate(new Date()));
+  const [todayStr, setTodayStr] = useState(getLocalFormattedDate());
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
-    setTodayStr(formatLocalDate(new Date()));
+    setTodayStr(getLocalFormattedDate());
   }, []);
 
   const [inputDate, setInputDate] = useState(todayStr); 
@@ -284,8 +275,7 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const getPhaseForDate = useCallback(
     (date: Date): PhaseDefinition | undefined => {
-      const dateStr = formatLocalDate(date);
-      // 1. 檢查歷史紀錄
+      const dateStr = getLocalFormattedDate(date);
       for (let i = history.length - 2; i >= 0; i--) {
         const h = history[i];
         if (h.length !== null) {
@@ -298,7 +288,6 @@ const PhoebeCycleTracker: React.FC = () => {
           }
         }
       }
-      // 2. 檢查當前週期
       const cur = history[history.length - 1];
       if (dateStr >= cur.startDate) {
         const day = getDaysDifference(cur.startDate, dateStr) + 1;
@@ -337,7 +326,7 @@ const PhoebeCycleTracker: React.FC = () => {
   }, [currentMonth]);
 
   const handleDateClick = (date: Date) => {
-    const dateStr = formatLocalDate(date);
+    const dateStr = getLocalFormattedDate(date);
     const phase = getPhaseForDate(date);
     if (!phase) return;
 
@@ -389,12 +378,11 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const handleUpsertPeriodRecord = () => {
     if (!inputDate) return;
-    // 使用 parseLocalDate 確保日期正確
-    const newDateStr = inputDate; 
-    const newDateObj = parseLocalDate(newDateStr);
+    const newDateObj = new Date(inputDate);
+    const newDateStr = getLocalFormattedDate(newDateObj);
 
     const existingIndex = history.findIndex(h => {
-        const hDate = parseLocalDate(h.startDate);
+        const hDate = new Date(h.startDate);
         return hDate.getFullYear() === newDateObj.getFullYear() && 
                hDate.getMonth() === newDateObj.getMonth();
     });
@@ -405,10 +393,10 @@ const PhoebeCycleTracker: React.FC = () => {
             alert("該日期已經是生理期開始日了。");
             return;
         }
-        if (window.confirm(`檢測到 ${oldDate.slice(0,7)} 已經有一筆紀錄 (${oldDate})。\n\n您是要將其修改為 ${newDateStr} 嗎？\n(這會自動更新後續的週期計算)`)) {
+        if (window.confirm(`檢測到 ${oldDate.slice(0,7)} 已經有一筆紀錄 (${oldDate})。\n\n您是要將其修改為 ${newDateStr} 嗎？`)) {
             const updated = [...history];
             updated[existingIndex].startDate = newDateStr;
-            updated.sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
+            updated.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
             
             if (existingIndex > 0) {
                 const prevStart = updated[existingIndex - 1].startDate;
@@ -458,7 +446,7 @@ const PhoebeCycleTracker: React.FC = () => {
     updated[updated.length - 1].startDate = editDate;
     updated[updated.length - 1].periodLength = editBleedingDays;
     setHistory(updated);
-    setCurrentMonth(parseLocalDate(editDate));
+    setCurrentMonth(new Date(editDate));
     setEditMode(false);
   };
 
@@ -483,13 +471,44 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
+  // 計算曲線圖的點 (模擬 Phoebe 的典型曲線)
+  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone') => {
+    const points: string[] = [];
+    const totalDays = 34; // 預設 34 天畫滿
+    const stepX = width / totalDays;
+    
+    for (let day = 1; day <= totalDays; day++) {
+        let intensity = 50; // 0-100 (0=高, 100=低 - SVG 座標系)
+        
+        if (type === 'appetite') {
+            // 食慾：PMS(30-34)最高(0)，濾泡期(7-24)最低(100)，排卵期(25-27)中等(50)
+            if (day <= 6) intensity = 60; // 生理期中等
+            else if (day <= 24) intensity = 90; // 濾泡期低
+            else if (day <= 27) intensity = 50; // 排卵期升
+            else if (day <= 29) intensity = 40; // 黃體前段升
+            else intensity = 10; // PMS 高峰
+        } else {
+            // 荷爾蒙(情緒)：模擬黃體素波動
+            // 濾泡期穩(80)，排卵期高(20)，PMS低落(90)
+            if (day <= 14) intensity = 80; // 穩定期
+            else if (day <= 24) intensity = 40; // 排卵後上升
+            else if (day <= 28) intensity = 20; // 黃體高峰
+            else intensity = 85; // PMS 驟降(情緒不穩)
+        }
+        
+        const x = (day - 1) * stepX;
+        const y = (intensity / 100) * height;
+        points.push(`${x},${y}`);
+    }
+    return points.join(' ');
+  };
+
   return (
     <div style={appContainerStyle}>
       {/* Header */}
       <header style={headerStyle}>
         <div style={{ width: '20px' }}></div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* 溫馨的 App 圖示 - 使用 SVG 繪製一個柔和的愛心 */}
             <svg width="24" height="24" viewBox="0 0 24 24" fill="#FF8FAB" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             </svg>
@@ -502,7 +521,7 @@ const PhoebeCycleTracker: React.FC = () => {
       <div style={dashboardCardStyle}>
         <div style={todayStatusContainerStyle}>
           <span style={todayDateStyle}>
-            {parseLocalDate(todayStr).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
+            {new Date(todayStr).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
           </span>
           <span style={todayLabelStyle}>今天</span>
 
@@ -575,6 +594,74 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
+      {/* 📉 新增：食慾與荷爾蒙曲線圖 */}
+      <div style={{ ...cardStyle, marginTop: '20px', padding: '15px' }}>
+        <h3 style={cardTitleStyle}>📉 週期趨勢分析</h3>
+        <div style={{ position: 'relative', height: '100px', marginTop: '10px', overflow: 'hidden' }}>
+            {/* 標籤 */}
+            <div style={{ position: 'absolute', top: 0, right: 0, fontSize: '0.7rem', color: '#999', display: 'flex', gap: '8px' }}>
+                <span style={{ color: '#F49B00' }}>● 食慾</span>
+                <span style={{ color: '#896CD9' }}>● 壓力/情緒</span>
+            </div>
+
+            <svg viewBox="0 0 340 100" style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
+                {/* 網格線 */}
+                <line x1="0" y1="50" x2="340" y2="50" stroke="#eee" strokeWidth="1" strokeDasharray="4" />
+                
+                {/* 食慾曲線 (橘色) */}
+                <polyline 
+                    points={getCurvePoints(340, 100, 'appetite')} 
+                    fill="none" 
+                    stroke="#F49B00" 
+                    strokeWidth="3" 
+                    strokeLinecap="round"
+                />
+                
+                {/* 荷爾蒙曲線 (紫色) */}
+                <polyline 
+                    points={getCurvePoints(340, 100, 'hormone')} 
+                    fill="none" 
+                    stroke="#896CD9" 
+                    strokeWidth="2" 
+                    strokeLinecap="round"
+                    strokeDasharray="4"
+                    opacity="0.7"
+                />
+
+                {/* 今天指標線 */}
+                <line 
+                    x1={(daysPassed / 34) * 340} 
+                    y1="0" 
+                    x2={(daysPassed / 34) * 340} 
+                    y2="100" 
+                    stroke="#333" 
+                    strokeWidth="2" 
+                    strokeDasharray="4"
+                />
+            </svg>
+            
+            {/* 今天標籤 */}
+            <div style={{ 
+                position: 'absolute', 
+                left: `calc(${(daysPassed / 34) * 100}% - 15px)`, 
+                bottom: '0', 
+                backgroundColor: '#333', 
+                color: 'white', 
+                fontSize: '0.6rem', 
+                padding: '2px 4px', 
+                borderRadius: '4px' 
+            }}>
+                今天
+            </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#aaa', marginTop: '5px' }}>
+            <span>Day 1</span>
+            <span>Day 14</span>
+            <span>Day 28</span>
+            <span>Day 34</span>
+        </div>
+      </div>
+
       {/* Calendar */}
       <div style={{ ...cardStyle, marginTop: '20px' }}>
         <h3 style={cardTitleStyle}>🗓️ 週期月曆</h3>
@@ -591,33 +678,34 @@ const PhoebeCycleTracker: React.FC = () => {
             <div key={i} style={dayNameStyle}>{n}</div>
           ))}
           {generateCalendarDays.map((date, i) => {
-            const dateStr = formatLocalDate(date);
+            const dateStr = getLocalFormattedDate(date);
             const phase = getPhaseForDate(date);
             const record = getSymptomRecordForDate(dateStr);
             const isToday = dateStr === todayStr;
             const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-            
-            // 視覺修正：生理期/週期階段使用實心背景，今天使用邊框
-            // 如果是今天，優先顯示今天的樣式 (邊框)，如果同時是生理期，背景色照舊但加邊框
-            
+            const isPeriodStart = history.some((h) => h.startDate === dateStr);
+
             return (
               <div
                 key={i}
                 onClick={() => handleDateClick(date)}
                 style={{
                   ...calendarDayStyle,
-                  backgroundColor: phase ? phase.lightColor : 'transparent', // 有階段就上色
+                  backgroundColor: isToday
+                    ? currentPhase.lightColor
+                    : phase
+                    ? `${phase.lightColor}90`
+                    : 'transparent',
                   opacity: isCurrentMonth ? 1 : 0.4,
-                  // 今天顯示粗邊框；否則顯示細邊框
                   border: isToday 
-                    ? `2px solid ${phase?.accent || '#333'}` 
+                    ? `2px solid ${currentPhase.accent}`
+                    : isPeriodStart
+                    ? `2px solid ${phase?.accent || '#E95A85'}`
                     : '1px solid #f5f5f5',
-                  // 今天字體加粗
-                  fontWeight: isToday ? 'bold' : 'normal',
                   cursor: phase ? 'pointer' : 'default',
                 }}
               >
-                <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}>
+                <div style={{ fontSize: '0.9rem', marginBottom: '4px', fontWeight: isToday ? 'bold' : 'normal' }}>
                   {date.getDate()}
                 </div>
                 {phase && (
@@ -685,7 +773,7 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* Info Cards - Only Symptoms and Care */}
+      {/* Info Cards */}
       <div style={{ display: 'grid', gap: '15px', marginTop: '20px' }}>
         <div style={cardStyle}>
           <h3 style={cardTitleStyle}>🌡️ 身體症狀與食慾</h3>
