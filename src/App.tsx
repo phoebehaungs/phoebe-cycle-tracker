@@ -127,21 +127,29 @@ const SYMPTOM_OPTIONS = {
 
 // --- 3. Helper Functions ---
 
+// 強制使用瀏覽器本地時間，解決時區問題
+const getLocalFormattedDate = (date: Date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const parseLocalDate = (dateStr: string): Date => {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
 };
 
 const formatLocalDate = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return getLocalFormattedDate(date);
 };
 
 const getDaysDifference = (date1: string, date2: string): number => {
   const d1 = parseLocalDate(date1);
   const d2 = parseLocalDate(date2);
+  // 重置時間為午夜，避免時分秒造成的誤差
+  d1.setHours(0,0,0,0);
+  d2.setHours(0,0,0,0);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
@@ -194,8 +202,12 @@ const PhoebeCycleTracker: React.FC = () => {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     try {
       const parsed = stored ? JSON.parse(stored) : INITIAL_HISTORY;
-      return parsed.sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
-    } catch { return INITIAL_HISTORY; }
+      return parsed.sort((a: CycleRecord, b: CycleRecord) => 
+        parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime()
+      );
+    } catch {
+      return INITIAL_HISTORY;
+    }
   });
 
   const [symptomRecords, setSymptomRecords] = useState<SymptomRecord[]>(() => {
@@ -206,10 +218,10 @@ const PhoebeCycleTracker: React.FC = () => {
   useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(history)); }, [history]);
   useEffect(() => { localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords)); }, [symptomRecords]);
 
-  const [todayStr, setTodayStr] = useState(formatLocalDate(new Date()));
+  const [todayStr, setTodayStr] = useState(getLocalFormattedDate());
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  useEffect(() => { setTodayStr(formatLocalDate(new Date())); }, []);
+  useEffect(() => { setTodayStr(getLocalFormattedDate()); }, []);
 
   const [inputDate, setInputDate] = useState(todayStr); 
   const [modalDetail, setModalDetail] = useState<DateDetail | null>(null);
@@ -390,7 +402,7 @@ const PhoebeCycleTracker: React.FC = () => {
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
 
-  // --- 曲線圖邏輯 (Overlaid Chart) ---
+  // --- 曲線圖邏輯 (Overlaid - 三條線疊加模式) ---
   const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {
     const points: string[] = [];
     const totalDays = 34; 
@@ -399,7 +411,7 @@ const PhoebeCycleTracker: React.FC = () => {
     for (let day = 1; day <= totalDays; day++) {
         let intensity = 50; 
         
-        // 視覺分離：食慾(中)，壓力(上)，水腫(下) 微調，避免完全重疊
+        // 微調：食慾(中)，壓力(上)，水腫(下)
         if (type === 'appetite') {
             if (day <= 6) intensity = 60 + 2;
             else if (day <= 24) intensity = 90 + 2;
@@ -431,6 +443,9 @@ const PhoebeCycleTracker: React.FC = () => {
   const edemaRiseDay = 25;
   const stressRiseDay = 28;
   const pmsPeakDay = 30;
+  const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
+  const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
+  const pmsPeakDateStr = formatShortDate(addDays(lastStartDate, pmsPeakDay - 1));
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -480,7 +495,7 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* 📉 週期趨勢分析 (Overlaid Chart + Summary Block) */}
+      {/* 📉 週期趨勢分析 (疊加圖表 + 摘要) */}
       <div style={{ ...cardStyle, marginTop: '20px', padding: '20px 15px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h3 style={{ ...cardTitleStyle, marginBottom: 0, borderBottom: 'none' }}>📉 週期趨勢分析</h3>
@@ -494,33 +509,30 @@ const PhoebeCycleTracker: React.FC = () => {
         {/* SVG Chart */}
         <div style={{ position: 'relative', height: '140px' }}>
             <svg viewBox="0 0 340 140" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
-                {/* Grid Lines */}
                 <line x1="0" y1="35" x2="340" y2="35" stroke="#f5f5f5" strokeWidth="1" />
                 <line x1="0" y1="70" x2="340" y2="70" stroke="#f5f5f5" strokeWidth="1" />
                 <line x1="0" y1="105" x2="340" y2="105" stroke="#f5f5f5" strokeWidth="1" />
                 
-                {/* Appetite (Orange) - Solid */}
+                {/* Appetite (Orange) */}
                 <polyline points={getCurvePoints(340, 140, 'appetite')} fill="none" stroke="#F49B00" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 
-                {/* Hormone/Mood (Purple) - Dotted */}
-                <polyline points={getCurvePoints(340, 140, 'hormone')} fill="none" stroke="#896CD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="3,3" opacity="0.8" />
+                {/* Hormone (Purple) */}
+                <polyline points={getCurvePoints(340, 140, 'hormone')} fill="none" stroke="#896CD9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="3,3" opacity="0.8" />
 
-                {/* Edema (Blue) - Dashed */}
+                {/* Edema (Blue) */}
                 <polyline points={getCurvePoints(340, 140, 'edema')} fill="none" stroke="#29B6F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6,4" />
 
                 {/* Today Line */}
                 <line x1={(daysPassed / 34) * 340} y1="0" x2={(daysPassed / 34) * 340} y2="140" stroke="#333" strokeWidth="1.5" strokeDasharray="4,2" />
                 
-                {/* 關鍵日標記線 (僅線條，無文字) */}
+                {/* Critical Date Lines (Only Lines) */}
                 <line x1={((edemaRiseDay-1) / 34) * 340} y1="0" x2={((edemaRiseDay-1) / 34) * 340} y2="140" stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
                 <line x1={((stressRiseDay-1) / 34) * 340} y1="0" x2={((stressRiseDay-1) / 34) * 340} y2="140" stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
                 <line x1={((pmsPeakDay-1) / 34) * 340} y1="0" x2={((pmsPeakDay-1) / 34) * 340} y2="140" stroke="#D6336C" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
             </svg>
-            {/* Today Label */}
             <div style={{ position: 'absolute', left: `calc(${(daysPassed / 34) * 100}% - 14px)`, bottom: '-22px', backgroundColor: '#333', color: 'white', fontSize: '0.65rem', padding: '2px 4px', borderRadius: '4px', fontWeight: 'bold', zIndex: 5, fontFamily: 'Noto Sans TC, sans-serif' }}>今天</div>
         </div>
 
-        {/* X-Axis Labels */}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginTop: '28px', fontFamily:'Nunito, sans-serif' }}>
             <span>Day 1</span>
             <span>Day 14</span>
@@ -528,23 +540,23 @@ const PhoebeCycleTracker: React.FC = () => {
             <span>Day 34</span>
         </div>
 
-        {/* 關鍵日期摘要列表 (Summary Block) */}
+        {/* 關鍵日期摘要列表 (Clean Summary) */}
         <div style={{ marginTop: '20px', backgroundColor: '#fdfdfd', borderRadius: '12px', padding: '12px', border: '1px solid #f0f0f0' }}>
             <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>📅 關鍵預測日期</h4>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '0.85rem' }}>
                 <span style={{color: '#29B6F6', fontWeight:'bold'}}>💧 水腫與食慾明顯上升</span>
-                <span style={{fontFamily:'Nunito, sans-serif'}}>{formatShortDate(addDays(lastStartDate, edemaRiseDay - 1))} (Day 25)</span>
+                <span style={{fontFamily:'Nunito, sans-serif'}}>{edemaRiseDateStr} (Day 25)</span>
             </div>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '0.85rem' }}>
                 <span style={{color: '#896CD9', fontWeight:'bold'}}>💜 壓力開始明顯上升</span>
-                <span style={{fontFamily:'Nunito, sans-serif'}}>{formatShortDate(addDays(lastStartDate, stressRiseDay - 1))} (Day 28)</span>
+                <span style={{fontFamily:'Nunito, sans-serif'}}>{stressRiseDateStr} (Day 28)</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                <span style={{color: '#D6336C', fontWeight:'bold', backgroundColor:'#FFE5EC', padding:'2px 6px', borderRadius:'4px'}}>🔥 PMS 全面高峰 (同時)</span>
-                <span style={{fontFamily:'Nunito, sans-serif', fontWeight:'bold', color: '#D6336C'}}>{formatShortDate(addDays(lastStartDate, pmsPeakDay - 1))} (Day 30)</span>
+                <span style={{color: '#D6336C', fontWeight:'bold', backgroundColor:'#FFE5EC', padding:'2px 6px', borderRadius:'4px'}}>🔥 PMS 全面高峰</span>
+                <span style={{fontFamily:'Nunito, sans-serif', fontWeight:'bold', color: '#D6336C'}}>{pmsPeakDateStr} (Day 30)</span>
             </div>
         </div>
       </div>
@@ -622,7 +634,9 @@ const PhoebeCycleTracker: React.FC = () => {
         <div style={cardStyle}>
           <h3 style={cardTitleStyle}>🌡️ 身體症狀與食慾</h3>
           <ul style={listListStyle}>
-            {[...currentPhase.symptoms, ...currentPhase.diet].map((s, i) => <li key={i}>{s}</li>)}
+            {[...currentPhase.symptoms, ...currentPhase.diet].map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
           </ul>
         </div>
         <div style={{ ...cardStyle, border: `2px solid ${currentPhase.lightColor}` }}>
@@ -719,5 +733,6 @@ const listListStyle: React.CSSProperties = { paddingLeft: '20px', lineHeight: '1
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
 const modalContentStyle: React.CSSProperties = { backgroundColor: 'white', padding: '25px', borderRadius: '16px', maxWidth: '90%' };
 const baseButtonStyle: React.CSSProperties = { flex: 1, padding: '10px', border: 'none', borderRadius: '8px', color: 'white', fontSize: '1rem', cursor: 'pointer' };
+const symptomRecordBoxStyle: React.CSSProperties = { marginTop: '20px' };
 
 export default PhoebeCycleTracker;
