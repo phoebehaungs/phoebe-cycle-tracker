@@ -20,8 +20,8 @@ interface PhaseDefinition {
 interface CycleRecord {
   id: string;
   startDate: string; // "YYYY-MM-DD"
-  length: number | null; // 週期長度 (兩次月經間隔)
-  periodLength?: number; // 生理期出血天數 (預設 6)
+  length: number | null; // 週期長度
+  periodLength?: number; // 生理期出血天數
 }
 
 interface SymptomRecord {
@@ -144,12 +144,13 @@ const SYMPTOM_OPTIONS = {
 
 // --- 3. Helper Functions ---
 
-// 確保獲取本地時間的 YYYY-MM-DD 格式
-const getFormattedDate = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  return `${y}-${m < 10 ? '0' + m : m}-${d < 10 ? '0' + d : d}`;
+// 強制使用瀏覽器本地時間，解決時區問題
+const getLocalFormattedDate = (date: Date = new Date()): string => {
+  const year = date.getFullYear();
+  // getMonth() 回傳 0-11，需 +1；padStart 確保補零
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const getDaysDifference = (date1: string, date2: string): number => {
@@ -163,7 +164,7 @@ const getDaysDifference = (date1: string, date2: string): number => {
 const addDays = (dateStr: string, days: number): string => {
   const r = new Date(dateStr);
   r.setDate(r.getDate() + days);
-  return getFormattedDate(r);
+  return getLocalFormattedDate(r);
 };
 
 const startOfMonth = (date: Date): Date =>
@@ -181,7 +182,6 @@ const createEmptyRecord = (date: string): SymptomRecord => ({
   notes: ''
 });
 
-// 根據出血天數動態調整規則 (Deep Clone)
 const getRulesForCycle = (periodLength: number = 6): PhaseDefinition[] => {
   const rules = JSON.parse(JSON.stringify(PHASE_RULES));
   rules[0].endDay = periodLength;
@@ -222,16 +222,15 @@ const PhoebeCycleTracker: React.FC = () => {
     localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords));
   }, [symptomRecords]);
 
-  // 確保 todayStr 是當下的本地時間
-  const [todayStr, setTodayStr] = useState(getFormattedDate(new Date()));
+  // 確保 todayStr 是當下的本地時間 (使用修正後的 getLocalFormattedDate)
+  const [todayStr, setTodayStr] = useState(getLocalFormattedDate());
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  // 確保組件掛載時更新一次時間，避免 SSR/Hydration 問題
   useEffect(() => {
-    setTodayStr(getFormattedDate(new Date()));
+    setTodayStr(getLocalFormattedDate());
   }, []);
 
-  const [inputDate, setInputDate] = useState(todayStr); // 預設輸入框為今天
+  const [inputDate, setInputDate] = useState(todayStr); 
   const [modalDetail, setModalDetail] = useState<DateDetail | null>(null);
   const [currentRecord, setCurrentRecord] = useState<SymptomRecord | null>(null);
 
@@ -280,7 +279,7 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const getPhaseForDate = useCallback(
     (date: Date): PhaseDefinition | undefined => {
-      const dateStr = getFormattedDate(date);
+      const dateStr = getLocalFormattedDate(date);
       for (let i = history.length - 2; i >= 0; i--) {
         const h = history[i];
         if (h.length !== null) {
@@ -331,7 +330,7 @@ const PhoebeCycleTracker: React.FC = () => {
   }, [currentMonth]);
 
   const handleDateClick = (date: Date) => {
-    const dateStr = getFormattedDate(date);
+    const dateStr = getLocalFormattedDate(date);
     const phase = getPhaseForDate(date);
     if (!phase) return;
 
@@ -384,7 +383,7 @@ const PhoebeCycleTracker: React.FC = () => {
   const handleUpsertPeriodRecord = () => {
     if (!inputDate) return;
     const newDateObj = new Date(inputDate);
-    const newDateStr = getFormattedDate(newDateObj);
+    const newDateStr = getLocalFormattedDate(newDateObj);
 
     const existingIndex = history.findIndex(h => {
         const hDate = new Date(h.startDate);
@@ -481,7 +480,13 @@ const PhoebeCycleTracker: React.FC = () => {
       {/* Header */}
       <header style={headerStyle}>
         <div style={{ width: '20px' }}></div>
-        <h1 style={headerTitleStyle}>🌷 PMS大作戰</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* 溫馨的 App 圖示 - 使用 SVG 繪製一個柔和的愛心 */}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="#FF8FAB" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+            <h1 style={headerTitleStyle}>PMS大作戰</h1>
+        </div>
         <div style={{ width: '20px' }}></div>
       </header>
 
@@ -489,6 +494,7 @@ const PhoebeCycleTracker: React.FC = () => {
       <div style={dashboardCardStyle}>
         <div style={todayStatusContainerStyle}>
           <span style={todayDateStyle}>
+            {/* 使用 getLocalFormattedDate 來處理日期顯示，確保一致性 */}
             {new Date(todayStr).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
           </span>
           <span style={todayLabelStyle}>今天</span>
@@ -546,14 +552,15 @@ const PhoebeCycleTracker: React.FC = () => {
             <div style={{ color: '#888', fontSize: '0.9rem', marginTop: '4px' }}>
               {currentPhase.hormone}
             </div>
-            {/* 溫馨提醒直接放在這裡 */}
+            {/* 溫馨提醒放在這裡 */}
             <div style={{ 
                 marginTop: '8px', 
                 fontSize: '0.85rem', 
-                color: '#666', 
+                color: '#555', 
                 backgroundColor: currentPhase.lightColor,
                 padding: '8px',
-                borderRadius: '8px'
+                borderRadius: '8px',
+                border: `1px dashed ${currentPhase.color}`
             }}>
                 💡 {currentPhase.tips}
             </div>
@@ -577,7 +584,7 @@ const PhoebeCycleTracker: React.FC = () => {
             <div key={i} style={dayNameStyle}>{n}</div>
           ))}
           {generateCalendarDays.map((date, i) => {
-            const dateStr = getFormattedDate(date);
+            const dateStr = getLocalFormattedDate(date);
             const phase = getPhaseForDate(date);
             const record = getSymptomRecordForDate(dateStr);
             const isToday = dateStr === todayStr;
@@ -591,18 +598,20 @@ const PhoebeCycleTracker: React.FC = () => {
                 style={{
                   ...calendarDayStyle,
                   backgroundColor: isToday
-                    ? currentPhase.lightColor
+                    ? currentPhase.lightColor // 今天的背景色
                     : phase
                     ? `${phase.lightColor}90`
                     : 'transparent',
                   opacity: isCurrentMonth ? 1 : 0.4,
-                  border: isPeriodStart
+                  border: isToday 
+                    ? `2px solid ${currentPhase.accent}` // 今天的邊框
+                    : isPeriodStart
                     ? `2px solid ${phase?.accent || '#E95A85'}`
                     : '1px solid #f5f5f5',
                   cursor: phase ? 'pointer' : 'default',
                 }}
               >
-                <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}>
+                <div style={{ fontSize: '0.9rem', marginBottom: '4px', fontWeight: isToday ? 'bold' : 'normal' }}>
                   {date.getDate()}
                 </div>
                 {phase && (
