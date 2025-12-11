@@ -19,9 +19,9 @@ interface PhaseDefinition {
 
 interface CycleRecord {
   id: string;
-  startDate: string; // "YYYY-MM-DD"
-  length: number | null; // 週期長度
-  periodLength?: number; // 生理期出血天數
+  startDate: string; 
+  length: number | null; 
+  periodLength?: number; 
 }
 
 interface SymptomRecord {
@@ -44,7 +44,7 @@ interface DateDetail {
 
 const INITIAL_HISTORY: CycleRecord[] = [
   { id: '1', startDate: '2025-11-05', length: 34, periodLength: 6 },
-  { id: '2', startDate: '2025-12-10', length: null, periodLength: 6 },
+  { id: '2', startDate: '2025-12-09', length: null, periodLength: 6 },
 ];
 
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
@@ -142,7 +142,7 @@ const SYMPTOM_OPTIONS = {
   sleep: ['良好', '普通', '睡不好']
 };
 
-// --- 3. Helper Functions (TimeZone Fixed) ---
+// --- 3. Helper Functions ---
 
 const parseLocalDate = (dateStr: string): Date => {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -156,19 +156,18 @@ const formatLocalDate = (date: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
-const getDaysDifference = (date1Str: string, date2Str: string): number => {
-  const d1 = parseLocalDate(date1Str);
-  const d2 = parseLocalDate(date2Str);
+const getDaysDifference = (date1: string, date2: string): number => {
+  const d1 = parseLocalDate(date1);
+  const d2 = parseLocalDate(date2);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
 const addDays = (dateStr: string, days: number): string => {
-  const d = parseLocalDate(dateStr);
-  d.setDate(d.getDate() + days);
-  return formatLocalDate(d);
+  const r = new Date(dateStr);
+  r.setDate(r.getDate() + days);
+  return formatLocalDate(r);
 };
 
-// 簡化版日期顯示 (MM/DD) 用於圖表
 const formatShortDate = (dateStr: string): string => {
     return dateStr.slice(5).replace('-', '/');
 };
@@ -198,6 +197,15 @@ const getRulesForCycle = (periodLength: number = 6): PhaseDefinition[] => {
 // --- 4. Main Component ---
 
 const PhoebeCycleTracker: React.FC = () => {
+  // Add Google Fonts
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@400;600;700&display=swap";
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+    return () => { document.head.removeChild(link); };
+  }, []);
+
   const [history, setHistory] = useState<CycleRecord[]>(() => {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     try {
@@ -242,6 +250,7 @@ const PhoebeCycleTracker: React.FC = () => {
   const [editBleedingDays, setEditBleedingDays] = useState(6);
   const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
 
+  // 核心計算
   const currentCycle = history[history.length - 1];
   const lastStartDate = currentCycle.startDate;
   const currentPeriodLength = currentCycle.periodLength || 6;
@@ -385,8 +394,8 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const handleUpsertPeriodRecord = () => {
     if (!inputDate) return;
-    const newDateStr = inputDate; 
-    const newDateObj = parseLocalDate(newDateStr);
+    const newDateObj = parseLocalDate(inputDate);
+    const newDateStr = inputDate;
 
     const existingIndex = history.findIndex(h => {
         const hDate = parseLocalDate(h.startDate);
@@ -484,24 +493,26 @@ const PhoebeCycleTracker: React.FC = () => {
     for (let day = 1; day <= totalDays; day++) {
         let intensity = 50; 
         
+        // 視覺分離：食慾向下偏移(+3)，水腫向上偏移(-3)，避免完全重疊
         if (type === 'appetite') {
-            if (day <= 6) intensity = 60;
-            else if (day <= 24) intensity = 90;
-            else if (day <= 27) intensity = 50;
-            else if (day <= 29) intensity = 40;
-            else intensity = 10;
+            if (day <= 6) intensity = 60 + 3;
+            else if (day <= 24) intensity = 90 + 3;
+            else if (day <= 27) intensity = 50 + 3;
+            else if (day <= 29) intensity = 40 + 3;
+            else intensity = 10 + 3;
         } else if (type === 'hormone') {
             if (day <= 14) intensity = 80;
             else if (day <= 24) intensity = 40;
             else if (day <= 28) intensity = 20;
             else intensity = 85;
         } else if (type === 'edema') {
-            if (day <= 3) intensity = 40;
-            else if (day <= 6) intensity = 70;
-            else if (day <= 24) intensity = 95;
-            else if (day <= 27) intensity = 60;
-            else if (day <= 29) intensity = 40;
-            else intensity = 10;
+            // 水腫曲線：PMS(30-34)最嚴重(10)，生理期初(1-3)次嚴重(40)，濾泡期(7-24)最輕盈(95)
+            if (day <= 3) intensity = 40 - 3;
+            else if (day <= 6) intensity = 70 - 3;
+            else if (day <= 24) intensity = 95 - 3;
+            else if (day <= 27) intensity = 60 - 3;
+            else if (day <= 29) intensity = 40 - 3;
+            else intensity = 10 - 3;
         }
         
         const x = (day - 1) * stepX;
@@ -511,12 +522,10 @@ const PhoebeCycleTracker: React.FC = () => {
     return points.join(' ');
   };
 
-  // 計算關鍵日期 (從 Day 1 開始推算)
-  const stressStartDay = 15; // Day 14後 (第15天開始)
-  const edemaPeakDay = 30; // 水腫高峰開始
-
-  const stressStartDateStr = formatShortDate(addDays(lastStartDate, stressStartDay - 1));
-  const edemaPeakDateStr = formatShortDate(addDays(lastStartDate, edemaPeakDay - 1));
+  const edemaRiseDay = 25;
+  const stressRiseDay = 28;
+  const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
+  const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -553,7 +562,8 @@ const PhoebeCycleTracker: React.FC = () => {
                 color: currentPhase.accent,
                 fontWeight: 'bold',
                 cursor: 'pointer',
-                marginLeft: 'auto'
+                marginLeft: 'auto',
+                fontFamily: 'Nunito, Noto Sans TC, sans-serif'
             }}
           >
             修改本週期
@@ -575,6 +585,7 @@ const PhoebeCycleTracker: React.FC = () => {
                   fontWeight: 'bold',
                   color: '#4a4a4a',
                   lineHeight: 1,
+                  fontFamily: 'Nunito, sans-serif'
                 }}
               >
                 {daysPassed}
@@ -595,7 +606,6 @@ const PhoebeCycleTracker: React.FC = () => {
             <div style={{ color: '#888', fontSize: '0.9rem', marginTop: '4px' }}>
               {currentPhase.hormone}
             </div>
-            {/* 溫馨提醒 */}
             <div style={{ 
                 marginTop: '8px', 
                 fontSize: '0.85rem', 
@@ -603,7 +613,8 @@ const PhoebeCycleTracker: React.FC = () => {
                 backgroundColor: currentPhase.lightColor,
                 padding: '8px',
                 borderRadius: '8px',
-                border: `1px dashed ${currentPhase.color}`
+                border: `1px dashed ${currentPhase.color}`,
+                lineHeight: '1.4'
             }}>
                 💡 {currentPhase.tips}
             </div>
@@ -611,82 +622,84 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* 📉 週期趨勢分析 */}
+      {/* 📉 週期趨勢分析 (解決重疊、字體優化) */}
       <div style={{ ...cardStyle, marginTop: '20px', padding: '15px 15px 25px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h3 style={{ ...cardTitleStyle, marginBottom: 0, borderBottom: 'none' }}>📉 週期趨勢分析</h3>
             <div style={{ fontSize: '0.75rem', color: '#999', display: 'flex', gap: '10px' }}>
                 <span style={{ color: '#F49B00', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'3px'}}>●</span>食慾</span>
                 <span style={{ color: '#896CD9', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'3px'}}>●</span>壓力</span>
-                <span style={{ color: '#29B6F6', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'3px'}}>●</span>水腫</span>
+                <span style={{ color: '#29B6F6', display: 'flex', alignItems: 'center' }}><span style={{fontSize:'1.2em', marginRight:'3px', borderBottom:'2px dashed #29B6F6'}}>●</span>水腫</span>
             </div>
         </div>
         
         <div style={{ position: 'relative', height: '140px', marginTop: '5px' }}>
             <svg viewBox="0 0 340 140" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
-                {/* Grid Lines */}
                 <line x1="0" y1="35" x2="340" y2="35" stroke="#f5f5f5" strokeWidth="1" />
                 <line x1="0" y1="70" x2="340" y2="70" stroke="#f5f5f5" strokeWidth="1" />
                 <line x1="0" y1="105" x2="340" y2="105" stroke="#f5f5f5" strokeWidth="1" />
                 
-                {/* Appetite (Orange) */}
+                {/* Appetite (Orange) - Solid */}
                 <polyline 
                     points={getCurvePoints(340, 140, 'appetite')} 
                     fill="none" 
                     stroke="#F49B00" 
                     strokeWidth="2.5" 
                     strokeLinecap="round"
+                    strokeLinejoin="round"
                 />
                 
-                {/* Hormone/Mood (Purple) */}
+                {/* Hormone/Mood (Purple) - Dotted */}
                 <polyline 
                     points={getCurvePoints(340, 140, 'hormone')} 
                     fill="none" 
                     stroke="#896CD9" 
                     strokeWidth="2" 
                     strokeLinecap="round"
-                    strokeDasharray="4,4"
-                    opacity="0.7"
+                    strokeLinejoin="round"
+                    strokeDasharray="3,3"
+                    opacity="0.8"
                 />
 
-                {/* Edema (Blue) */}
+                {/* Edema (Blue) - Dashed */}
                 <polyline 
                     points={getCurvePoints(340, 140, 'edema')} 
                     fill="none" 
                     stroke="#29B6F6" 
                     strokeWidth="2.5" 
                     strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="6,4"
                 />
 
                 {/* Today Line */}
                 <line 
                     x1={(daysPassed / 34) * 340} y1="0" 
                     x2={(daysPassed / 34) * 340} y2="140" 
-                    stroke="#333" strokeWidth="2" strokeDasharray="3,3"
+                    stroke="#333" strokeWidth="1.5" strokeDasharray="4,2"
                 />
 
-                {/* 預測點 1: 壓力開始 (Day 15) - 放在中間偏低位置 */}
+                {/* Edema Rise Marker (High label) */}
                 <line 
-                    x1={((stressStartDay-1) / 34) * 340} y1="40" 
-                    x2={((stressStartDay-1) / 34) * 340} y2="140" 
-                    stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.6"
+                    x1={((edemaRiseDay-1) / 34) * 340} y1="5" 
+                    x2={((edemaRiseDay-1) / 34) * 340} y2="140" 
+                    stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"
                 />
-                <text x={((stressStartDay-1) / 34) * 340} y="35" fill="#896CD9" fontSize="10" textAnchor="middle">
-                    {stressStartDateStr} 壓力始
+                <text x={((edemaRiseDay-1) / 34) * 340} y="0" fill="#29B6F6" fontSize="10" fontWeight="bold" textAnchor="middle" style={{fontFamily: 'Nunito, sans-serif'}}>
+                    {edemaRiseDateStr} 水腫↑
                 </text>
 
-                 {/* 預測點 2: 水腫高峰 (Day 30) - 放在頂部位置 */}
+                 {/* Stress Rise Marker (Low label) */}
                  <line 
-                    x1={((edemaPeakDay-1) / 34) * 340} y1="5" 
-                    x2={((edemaPeakDay-1) / 34) * 340} y2="140" 
-                    stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.6"
+                    x1={((stressRiseDay-1) / 34) * 340} y1="40" 
+                    x2={((stressRiseDay-1) / 34) * 340} y2="140" 
+                    stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.5"
                 />
-                <text x={((edemaPeakDay-1) / 34) * 340} y="0" fill="#29B6F6" fontSize="10" textAnchor="end">
-                    {edemaPeakDateStr} 水腫高峰
+                <text x={((stressRiseDay-1) / 34) * 340} y="35" fill="#896CD9" fontSize="10" fontWeight="bold" textAnchor="middle" style={{fontFamily: 'Nunito, sans-serif'}}>
+                    {stressRiseDateStr} 壓力↑
                 </text>
             </svg>
             
-            {/* Today Label */}
             <div style={{ 
                 position: 'absolute', 
                 left: `calc(${(daysPassed / 34) * 100}% - 18px)`, 
@@ -702,7 +715,7 @@ const PhoebeCycleTracker: React.FC = () => {
                 今天
             </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginTop: '28px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginTop: '28px', fontFamily:'Nunito, sans-serif' }}>
             <span>Day 1</span>
             <span>Day 14 (排卵)</span>
             <span>Day 28 (PMS)</span>
@@ -750,7 +763,7 @@ const PhoebeCycleTracker: React.FC = () => {
                   fontWeight: isToday ? 'bold' : 'normal'
                 }}
               >
-                <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}>
+                <div style={{ fontSize: '0.9rem', marginBottom: '4px', fontFamily: 'Nunito, sans-serif' }}>
                   {date.getDate()}
                 </div>
                 {phase && (
@@ -844,7 +857,7 @@ const PhoebeCycleTracker: React.FC = () => {
         <div style={modalOverlayStyle}>
           <div style={{ ...modalContentStyle, width: '360px' }}>
             <h3 style={{ color: modalDetail.phase.color }}>{modalDetail.date} 詳情</h3>
-            <p style={{ marginBottom: '5px' }}>週期日: <strong>Day {modalDetail.day}</strong></p>
+            <p style={{ marginBottom: '5px' }}>週期日: <strong style={{fontFamily:'Nunito, sans-serif'}}>Day {modalDetail.day}</strong></p>
             <p style={{ marginBottom: '5px' }}>階段: <strong style={{ color: modalDetail.phase.color }}>{modalDetail.phase.name}</strong></p>
             
             <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
@@ -913,7 +926,8 @@ const RecordDropdown: React.FC<{ label: string; options: string[]; value: string
             fontSize: '0.85rem',
             cursor: 'pointer',
             backgroundColor: value === op ? '#896CD9' : '#f9f9f9',
-            color: value === op ? 'white' : '#555'
+            color: value === op ? 'white' : '#555',
+            fontFamily: 'Noto Sans TC, sans-serif'
           }}
         >
           {op}
@@ -925,28 +939,28 @@ const RecordDropdown: React.FC<{ label: string; options: string[]; value: string
 
 // --- Styles ---
 
-const appContainerStyle: React.CSSProperties = { maxWidth: '600px', margin: '0 auto', padding: '0 20px 40px', fontFamily: 'sans-serif', backgroundColor: '#faf9f6', minHeight: '100vh' };
+const appContainerStyle: React.CSSProperties = { maxWidth: '600px', margin: '0 auto', padding: '0 20px 40px', fontFamily: 'Noto Sans TC, sans-serif', backgroundColor: '#faf9f6', minHeight: '100vh', letterSpacing: '0.02em' };
 const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 0', marginBottom: '10px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' };
-const headerTitleStyle: React.CSSProperties = { fontSize: '1.2rem', margin: 0, color: '#333' };
+const headerTitleStyle: React.CSSProperties = { fontSize: '1.2rem', margin: 0, color: '#333', fontWeight: 'bold' };
 const dashboardCardStyle: React.CSSProperties = { backgroundColor: 'white', padding: '25px 20px', textAlign: 'center', marginBottom: '20px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' };
 const todayStatusContainerStyle: React.CSSProperties = { display: 'flex', gap: '8px', alignItems: 'baseline', marginBottom: '10px' };
-const todayDateStyle: React.CSSProperties = { fontSize: '1.5rem', fontWeight: 'bold', color: '#333' };
+const todayDateStyle: React.CSSProperties = { fontSize: '1.5rem', fontWeight: 'bold', color: '#333', fontFamily: 'Nunito, sans-serif' };
 const todayLabelStyle: React.CSSProperties = { fontSize: '1.1rem', color: '#666' };
 const circularChartContainerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '10px' };
 const circularChartStyle: React.CSSProperties = { width: '110px', height: '110px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' };
 const circularChartInnerStyle: React.CSSProperties = { width: '90px', height: '90px', borderRadius: '50%', backgroundColor: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' };
 const statusTextStyle: React.CSSProperties = { marginLeft: '20px', textAlign: 'left', flex: 1 };
 const cardStyle: React.CSSProperties = { backgroundColor: 'white', padding: '20px', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' };
-const cardTitleStyle: React.CSSProperties = { fontSize: '1.1rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '8px', marginBottom: '15px', color: '#444' };
-const navButtonStyle: React.CSSProperties = { background: '#f5f5f5', border: 'none', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', color: '#555' };
+const cardTitleStyle: React.CSSProperties = { fontSize: '1.1rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '8px', marginBottom: '15px', color: '#444', fontWeight: 'bold' };
+const navButtonStyle: React.CSSProperties = { background: '#f5f5f5', border: 'none', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', color: '#555', fontFamily: 'Nunito, sans-serif' };
 const calendarGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' };
 const dayNameStyle: React.CSSProperties = { textAlign: 'center', fontSize: '0.85rem', color: '#999', marginBottom: '5px' };
 const calendarDayStyle: React.CSSProperties = { minHeight: '50px', borderRadius: '8px', border: '1px solid #f5f5f5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' };
 const recordDotStyle: React.CSSProperties = { width: '5px', height: '5px', borderRadius: '50%', position: 'absolute', bottom: '4px', right: '4px' };
 const gridContainerStyle: React.CSSProperties = { display: 'flex', gap: '15px', flexWrap: 'wrap', marginTop: '20px' };
 const predictionLabelStyle: React.CSSProperties = { fontSize: '0.9rem', color: '#888', marginBottom: '4px' };
-const predictionDateStyle: React.CSSProperties = { fontSize: '1.3rem', fontWeight: 'bold' };
-const inputStyle: React.CSSProperties = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box' };
+const predictionDateStyle: React.CSSProperties = { fontSize: '1.3rem', fontWeight: 'bold', fontFamily: 'Nunito, sans-serif' };
+const inputStyle: React.CSSProperties = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', boxSizing: 'border-box', fontFamily: 'Nunito, sans-serif' };
 const recordButtonStyle: React.CSSProperties = { width: '100%', padding: '12px', backgroundColor: '#6AB04C', color: 'white', border: 'none', borderRadius: '8px', marginTop: '10px', fontSize: '1rem', cursor: 'pointer' };
 const listListStyle: React.CSSProperties = { paddingLeft: '20px', lineHeight: '1.6', color: '#555' };
 const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
