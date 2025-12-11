@@ -44,7 +44,7 @@ interface DateDetail {
 
 const INITIAL_HISTORY: CycleRecord[] = [
   { id: '1', startDate: '2025-11-05', length: 34, periodLength: 6 },
-  { id: '2', startDate: '2025-12-09', length: null, periodLength: 6 },
+  { id: '2', startDate: '2025-12-10', length: null, periodLength: 6 }, // 假設最後一次是 12/10
 ];
 
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
@@ -142,29 +142,33 @@ const SYMPTOM_OPTIONS = {
   sleep: ['良好', '普通', '睡不好']
 };
 
-// --- 3. Helper Functions ---
+// --- 3. Helper Functions (TimeZone Fixed) ---
 
-// 強制使用瀏覽器本地時間，解決時區問題
-const getLocalFormattedDate = (date: Date = new Date()): string => {
-  const year = date.getFullYear();
-  // getMonth() 回傳 0-11，需 +1；padStart 確保補零
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+// 解析 YYYY-MM-DD 為當地的 Date 物件 (午夜)
+const parseLocalDate = (dateStr: string): Date => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
 };
 
-const getDaysDifference = (date1: string, date2: string): number => {
-  const d1 = new Date(date1);
-  const d2 = new Date(date2);
-  d1.setHours(0,0,0,0);
-  d2.setHours(0,0,0,0);
+// 將 Date 物件格式化為當地的 YYYY-MM-DD
+const formatLocalDate = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+// 計算兩個日期字串之間的天數差 (本地時間計算)
+const getDaysDifference = (date1Str: string, date2Str: string): number => {
+  const d1 = parseLocalDate(date1Str);
+  const d2 = parseLocalDate(date2Str);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
 const addDays = (dateStr: string, days: number): string => {
-  const r = new Date(dateStr);
-  r.setDate(r.getDate() + days);
-  return getLocalFormattedDate(r);
+  const d = parseLocalDate(dateStr);
+  d.setDate(d.getDate() + days);
+  return formatLocalDate(d);
 };
 
 const startOfMonth = (date: Date): Date =>
@@ -182,6 +186,7 @@ const createEmptyRecord = (date: string): SymptomRecord => ({
   notes: ''
 });
 
+// 根據出血天數動態調整規則 (Deep Clone)
 const getRulesForCycle = (periodLength: number = 6): PhaseDefinition[] => {
   const rules = JSON.parse(JSON.stringify(PHASE_RULES));
   rules[0].endDay = periodLength;
@@ -192,7 +197,7 @@ const getRulesForCycle = (periodLength: number = 6): PhaseDefinition[] => {
 // --- 4. Main Component ---
 
 const PhoebeCycleTracker: React.FC = () => {
-  // 狀態初始化
+  // 讀取歷史紀錄
   const [history, setHistory] = useState<CycleRecord[]>(() => {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     try {
@@ -222,12 +227,12 @@ const PhoebeCycleTracker: React.FC = () => {
     localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords));
   }, [symptomRecords]);
 
-  // 確保 todayStr 是當下的本地時間 (使用修正後的 getLocalFormattedDate)
-  const [todayStr, setTodayStr] = useState(getLocalFormattedDate());
+  // 使用 formatLocalDate 確保今天是本地時間
+  const [todayStr, setTodayStr] = useState(formatLocalDate(new Date()));
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
-    setTodayStr(getLocalFormattedDate());
+    setTodayStr(formatLocalDate(new Date()));
   }, []);
 
   const [inputDate, setInputDate] = useState(todayStr); 
@@ -279,7 +284,8 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const getPhaseForDate = useCallback(
     (date: Date): PhaseDefinition | undefined => {
-      const dateStr = getLocalFormattedDate(date);
+      const dateStr = formatLocalDate(date);
+      // 1. 檢查歷史紀錄
       for (let i = history.length - 2; i >= 0; i--) {
         const h = history[i];
         if (h.length !== null) {
@@ -292,6 +298,7 @@ const PhoebeCycleTracker: React.FC = () => {
           }
         }
       }
+      // 2. 檢查當前週期
       const cur = history[history.length - 1];
       if (dateStr >= cur.startDate) {
         const day = getDaysDifference(cur.startDate, dateStr) + 1;
@@ -330,7 +337,7 @@ const PhoebeCycleTracker: React.FC = () => {
   }, [currentMonth]);
 
   const handleDateClick = (date: Date) => {
-    const dateStr = getLocalFormattedDate(date);
+    const dateStr = formatLocalDate(date);
     const phase = getPhaseForDate(date);
     if (!phase) return;
 
@@ -382,11 +389,12 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const handleUpsertPeriodRecord = () => {
     if (!inputDate) return;
-    const newDateObj = new Date(inputDate);
-    const newDateStr = getLocalFormattedDate(newDateObj);
+    // 使用 parseLocalDate 確保日期正確
+    const newDateStr = inputDate; 
+    const newDateObj = parseLocalDate(newDateStr);
 
     const existingIndex = history.findIndex(h => {
-        const hDate = new Date(h.startDate);
+        const hDate = parseLocalDate(h.startDate);
         return hDate.getFullYear() === newDateObj.getFullYear() && 
                hDate.getMonth() === newDateObj.getMonth();
     });
@@ -400,7 +408,7 @@ const PhoebeCycleTracker: React.FC = () => {
         if (window.confirm(`檢測到 ${oldDate.slice(0,7)} 已經有一筆紀錄 (${oldDate})。\n\n您是要將其修改為 ${newDateStr} 嗎？\n(這會自動更新後續的週期計算)`)) {
             const updated = [...history];
             updated[existingIndex].startDate = newDateStr;
-            updated.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+            updated.sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
             
             if (existingIndex > 0) {
                 const prevStart = updated[existingIndex - 1].startDate;
@@ -450,7 +458,7 @@ const PhoebeCycleTracker: React.FC = () => {
     updated[updated.length - 1].startDate = editDate;
     updated[updated.length - 1].periodLength = editBleedingDays;
     setHistory(updated);
-    setCurrentMonth(new Date(editDate));
+    setCurrentMonth(parseLocalDate(editDate));
     setEditMode(false);
   };
 
@@ -494,8 +502,7 @@ const PhoebeCycleTracker: React.FC = () => {
       <div style={dashboardCardStyle}>
         <div style={todayStatusContainerStyle}>
           <span style={todayDateStyle}>
-            {/* 使用 getLocalFormattedDate 來處理日期顯示，確保一致性 */}
-            {new Date(todayStr).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
+            {parseLocalDate(todayStr).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
           </span>
           <span style={todayLabelStyle}>今天</span>
 
@@ -584,34 +591,33 @@ const PhoebeCycleTracker: React.FC = () => {
             <div key={i} style={dayNameStyle}>{n}</div>
           ))}
           {generateCalendarDays.map((date, i) => {
-            const dateStr = getLocalFormattedDate(date);
+            const dateStr = formatLocalDate(date);
             const phase = getPhaseForDate(date);
             const record = getSymptomRecordForDate(dateStr);
             const isToday = dateStr === todayStr;
             const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-            const isPeriodStart = history.some((h) => h.startDate === dateStr);
-
+            
+            // 視覺修正：生理期/週期階段使用實心背景，今天使用邊框
+            // 如果是今天，優先顯示今天的樣式 (邊框)，如果同時是生理期，背景色照舊但加邊框
+            
             return (
               <div
                 key={i}
                 onClick={() => handleDateClick(date)}
                 style={{
                   ...calendarDayStyle,
-                  backgroundColor: isToday
-                    ? currentPhase.lightColor // 今天的背景色
-                    : phase
-                    ? `${phase.lightColor}90`
-                    : 'transparent',
+                  backgroundColor: phase ? phase.lightColor : 'transparent', // 有階段就上色
                   opacity: isCurrentMonth ? 1 : 0.4,
+                  // 今天顯示粗邊框；否則顯示細邊框
                   border: isToday 
-                    ? `2px solid ${currentPhase.accent}` // 今天的邊框
-                    : isPeriodStart
-                    ? `2px solid ${phase?.accent || '#E95A85'}`
+                    ? `2px solid ${phase?.accent || '#333'}` 
                     : '1px solid #f5f5f5',
+                  // 今天字體加粗
+                  fontWeight: isToday ? 'bold' : 'normal',
                   cursor: phase ? 'pointer' : 'default',
                 }}
               >
-                <div style={{ fontSize: '0.9rem', marginBottom: '4px', fontWeight: isToday ? 'bold' : 'normal' }}>
+                <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}>
                   {date.getDate()}
                 </div>
                 {phase && (
