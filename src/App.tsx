@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
-// --- 1. 定義資料結構 --- 
+// --- 1. 定義資料結構 ---
 
 interface PhaseDefinition {
   name: string;
@@ -60,7 +60,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     care: ['不逼自己運動', '多喝暖身飲', '早餐多一點蛋白質'],
     tips: '這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。',
     color: '#FF8FAB', // 溫暖粉紅
-    lightColor: '#FFF0F5',
+    lightColor: '#FFE7EE',
     hormone: '雌激素與黃體素低點',
     accent: '#FB6F92'
   },
@@ -127,29 +127,21 @@ const SYMPTOM_OPTIONS = {
 
 // --- 3. Helper Functions ---
 
-// 強制使用瀏覽器本地時間，解決時區問題
-const getLocalFormattedDate = (date: Date = new Date()): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 const parseLocalDate = (dateStr: string): Date => {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
 };
 
 const formatLocalDate = (date: Date): string => {
-  return getLocalFormattedDate(date);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 };
 
 const getDaysDifference = (date1: string, date2: string): number => {
   const d1 = parseLocalDate(date1);
   const d2 = parseLocalDate(date2);
-  // 重置時間為午夜，避免時分秒造成的誤差
-  d1.setHours(0,0,0,0);
-  d2.setHours(0,0,0,0);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
@@ -202,12 +194,8 @@ const PhoebeCycleTracker: React.FC = () => {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     try {
       const parsed = stored ? JSON.parse(stored) : INITIAL_HISTORY;
-      return parsed.sort((a: CycleRecord, b: CycleRecord) => 
-        parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime()
-      );
-    } catch {
-      return INITIAL_HISTORY;
-    }
+      return parsed.sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
+    } catch { return INITIAL_HISTORY; }
   });
 
   const [symptomRecords, setSymptomRecords] = useState<SymptomRecord[]>(() => {
@@ -218,10 +206,9 @@ const PhoebeCycleTracker: React.FC = () => {
   useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(history)); }, [history]);
   useEffect(() => { localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords)); }, [symptomRecords]);
 
-  const [todayStr, setTodayStr] = useState(getLocalFormattedDate());
+  // 確保 "今天" 是基於本地時間，且不會因為跨日而未更新 (依賴組件重繪)
+  const todayStr = useMemo(() => formatLocalDate(new Date()), []); 
   const [currentMonth, setCurrentMonth] = useState(new Date());
-
-  useEffect(() => { setTodayStr(getLocalFormattedDate()); }, []);
 
   const [inputDate, setInputDate] = useState(todayStr); 
   const [modalDetail, setModalDetail] = useState<DateDetail | null>(null);
@@ -402,7 +389,7 @@ const PhoebeCycleTracker: React.FC = () => {
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
 
-  // --- 曲線圖邏輯 (Overlaid - 三條線疊加模式) ---
+  // --- 曲線圖邏輯 ---
   const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {
     const points: string[] = [];
     const totalDays = 34; 
@@ -410,8 +397,6 @@ const PhoebeCycleTracker: React.FC = () => {
     
     for (let day = 1; day <= totalDays; day++) {
         let intensity = 50; 
-        
-        // 微調：食慾(中)，壓力(上)，水腫(下)
         if (type === 'appetite') {
             if (day <= 6) intensity = 60 + 2;
             else if (day <= 24) intensity = 90 + 2;
@@ -431,7 +416,6 @@ const PhoebeCycleTracker: React.FC = () => {
             else if (day <= 29) intensity = 40 - 2;
             else intensity = 10 - 2;
         }
-        
         const x = (day - 1) * stepX;
         const y = (intensity / 100) * height;
         points.push(`${x},${y}`);
@@ -446,6 +430,9 @@ const PhoebeCycleTracker: React.FC = () => {
   const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
   const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
   const pmsPeakDateStr = formatShortDate(addDays(lastStartDate, pmsPeakDay - 1));
+
+  // 用於圖表的 "今天" 位置 (限制在 0-34 範圍內，避免線條跑出去)
+  const chartDaysPassed = Math.min(Math.max(daysPassed, 1), 34);
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -495,7 +482,7 @@ const PhoebeCycleTracker: React.FC = () => {
         </div>
       </div>
 
-      {/* 📉 週期趨勢分析 (疊加圖表 + 摘要) */}
+      {/* 📉 週期趨勢分析 */}
       <div style={{ ...cardStyle, marginTop: '20px', padding: '20px 15px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h3 style={{ ...cardTitleStyle, marginBottom: 0, borderBottom: 'none' }}>📉 週期趨勢分析</h3>
@@ -513,24 +500,37 @@ const PhoebeCycleTracker: React.FC = () => {
                 <line x1="0" y1="70" x2="340" y2="70" stroke="#f5f5f5" strokeWidth="1" />
                 <line x1="0" y1="105" x2="340" y2="105" stroke="#f5f5f5" strokeWidth="1" />
                 
-                {/* Appetite (Orange) */}
+                {/* Lines */}
                 <polyline points={getCurvePoints(340, 140, 'appetite')} fill="none" stroke="#F49B00" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                
-                {/* Hormone (Purple) */}
                 <polyline points={getCurvePoints(340, 140, 'hormone')} fill="none" stroke="#896CD9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="3,3" opacity="0.8" />
-
-                {/* Edema (Blue) */}
                 <polyline points={getCurvePoints(340, 140, 'edema')} fill="none" stroke="#29B6F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6,4" />
 
                 {/* Today Line */}
-                <line x1={(daysPassed / 34) * 340} y1="0" x2={(daysPassed / 34) * 340} y2="140" stroke="#333" strokeWidth="1.5" strokeDasharray="4,2" />
+                <line 
+                    x1={(chartDaysPassed / 34) * 340} y1="0" 
+                    x2={(chartDaysPassed / 34) * 340} y2="140" 
+                    stroke="#333" strokeWidth="1.5" strokeDasharray="4,2"
+                />
                 
-                {/* Critical Date Lines (Only Lines) */}
+                {/* 關鍵日期 Vertical Lines (No Text) */}
                 <line x1={((edemaRiseDay-1) / 34) * 340} y1="0" x2={((edemaRiseDay-1) / 34) * 340} y2="140" stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
                 <line x1={((stressRiseDay-1) / 34) * 340} y1="0" x2={((stressRiseDay-1) / 34) * 340} y2="140" stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
                 <line x1={((pmsPeakDay-1) / 34) * 340} y1="0" x2={((pmsPeakDay-1) / 34) * 340} y2="140" stroke="#D6336C" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
             </svg>
-            <div style={{ position: 'absolute', left: `calc(${(daysPassed / 34) * 100}% - 14px)`, bottom: '-22px', backgroundColor: '#333', color: 'white', fontSize: '0.65rem', padding: '2px 4px', borderRadius: '4px', fontWeight: 'bold', zIndex: 5, fontFamily: 'Noto Sans TC, sans-serif' }}>今天</div>
+            {/* Today Label - SVG 內部 X 座標定位 */}
+            <div style={{ 
+                position: 'absolute', 
+                left: `calc(${(chartDaysPassed / 34) * 100}% - 14px)`, 
+                bottom: '-22px', 
+                backgroundColor: '#333', 
+                color: 'white', 
+                fontSize: '0.65rem', 
+                padding: '2px 4px', 
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                zIndex: 5,
+                fontFamily: 'Noto Sans TC, sans-serif'
+            }}>今天</div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginTop: '28px', fontFamily:'Nunito, sans-serif' }}>
@@ -540,7 +540,7 @@ const PhoebeCycleTracker: React.FC = () => {
             <span>Day 34</span>
         </div>
 
-        {/* 關鍵日期摘要列表 (Clean Summary) */}
+        {/* 關鍵日期摘要列表 */}
         <div style={{ marginTop: '20px', backgroundColor: '#fdfdfd', borderRadius: '12px', padding: '12px', border: '1px solid #f0f0f0' }}>
             <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>📅 關鍵預測日期</h4>
             
@@ -580,7 +580,21 @@ const PhoebeCycleTracker: React.FC = () => {
             const record = getSymptomRecordForDate(dateStr);
             const isToday = dateStr === todayStr;
             const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-            const isPeriodStart = history.some((h) => h.startDate === dateStr);
+            
+            // 修正：今天使用實心深色圓形，週期使用淺色方圓
+            const todayStyle = isToday ? {
+                backgroundColor: '#333',
+                color: 'white',
+                borderRadius: '50%',
+                fontWeight: 'bold',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+            } : {};
+
+            const phaseStyle = (!isToday && phase) ? {
+                backgroundColor: phase.lightColor,
+                borderRadius: '8px',
+                color: '#333'
+            } : {};
 
             return (
               <div
@@ -588,20 +602,16 @@ const PhoebeCycleTracker: React.FC = () => {
                 onClick={() => handleDateClick(date)}
                 style={{
                   ...calendarDayStyle,
-                  backgroundColor: phase ? phase.lightColor : 'transparent',
                   opacity: isCurrentMonth ? 1 : 0.4,
-                  border: isToday 
-                    ? `2px solid ${currentPhase.accent}`
-                    : isPeriodStart
-                    ? `2px solid ${phase?.accent || '#E95A85'}`
-                    : '1px solid #f5f5f5',
                   cursor: phase ? 'pointer' : 'default',
-                  fontWeight: isToday ? 'bold' : 'normal'
+                  ...phaseStyle,
+                  ...todayStyle
                 }}
               >
                 <div style={{ fontSize: '0.9rem', marginBottom: '4px', fontFamily: 'Nunito, sans-serif' }}>{date.getDate()}</div>
-                {phase && <div style={{ backgroundColor: phase.color, height: '4px', borderRadius: '2px', width: '70%', margin: '0 auto', marginBottom: record ? '2px' : '0' }}></div>}
-                {record && <div style={{...recordDotStyle, backgroundColor: phase?.accent}}></div>}
+                {/* 只有非今天且有階段時顯示小條 */}
+                {!isToday && phase && <div style={{ backgroundColor: phase.color, height: '4px', borderRadius: '2px', width: '70%', margin: '0 auto', marginBottom: record ? '2px' : '0' }}></div>}
+                {record && <div style={{...recordDotStyle, backgroundColor: isToday ? 'white' : phase?.accent}}></div>}
               </div>
             );
           })}
@@ -634,9 +644,7 @@ const PhoebeCycleTracker: React.FC = () => {
         <div style={cardStyle}>
           <h3 style={cardTitleStyle}>🌡️ 身體症狀與食慾</h3>
           <ul style={listListStyle}>
-            {[...currentPhase.symptoms, ...currentPhase.diet].map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
+            {[...currentPhase.symptoms, ...currentPhase.diet].map((s, i) => <li key={i}>{s}</li>)}
           </ul>
         </div>
         <div style={{ ...cardStyle, border: `2px solid ${currentPhase.lightColor}` }}>
@@ -722,7 +730,7 @@ const cardTitleStyle: React.CSSProperties = { fontSize: '1.1rem', borderBottom: 
 const navButtonStyle: React.CSSProperties = { background: '#f5f5f5', border: 'none', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', color: '#555', fontFamily: 'Nunito, sans-serif' };
 const calendarGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' };
 const dayNameStyle: React.CSSProperties = { textAlign: 'center', fontSize: '0.85rem', color: '#999', marginBottom: '5px' };
-const calendarDayStyle: React.CSSProperties = { minHeight: '50px', borderRadius: '8px', border: '1px solid #f5f5f5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' };
+const calendarDayStyle: React.CSSProperties = { minHeight: '50px', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' };
 const recordDotStyle: React.CSSProperties = { width: '5px', height: '5px', borderRadius: '50%', position: 'absolute', bottom: '4px', right: '4px' };
 const gridContainerStyle: React.CSSProperties = { display: 'flex', gap: '15px', flexWrap: 'wrap', marginTop: '20px' };
 const predictionLabelStyle: React.CSSProperties = { fontSize: '0.9rem', color: '#888', marginBottom: '4px' };
