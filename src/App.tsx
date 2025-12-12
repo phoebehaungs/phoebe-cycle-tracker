@@ -40,7 +40,7 @@ interface DateDetail {
   record: SymptomRecord | undefined;
 }
 
-// --- 2. 初始資料與規則 ---
+// --- 2. 初始資料 ---
 
 const INITIAL_HISTORY: CycleRecord[] = [
   { id: '1', startDate: '2025-11-05', length: 34, periodLength: 6 },
@@ -49,75 +49,6 @@ const INITIAL_HISTORY: CycleRecord[] = [
 
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
-
-const PHASE_RULES: PhaseDefinition[] = [
-  {
-    name: '生理期',
-    startDay: 1,
-    endDay: 6,
-    symptoms: ['疲倦、想休息', '水腫慢慢消退中', '偶爾子宮悶感'],
-    diet: ['食慾偏低/正常', '想吃冰(荷爾蒙反應)'],
-    care: ['不逼自己運動', '多喝暖身飲', '早餐多一點蛋白質'],
-    tips: '這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。',
-    color: '#FF8FAB', // 溫暖粉紅
-    lightColor: '#FFF0F5',
-    hormone: '雌激素與黃體素低點',
-    accent: '#FB6F92'
-  },
-  {
-    name: '濾泡期 (黃金期)',
-    startDay: 7,
-    endDay: 24,
-    symptoms: ['精力恢復', '身體最輕盈(無水腫)', '心情平穩'],
-    diet: ['食慾最低', '最好控制', '飽足感良好'],
-    care: ['適合減脂/建立習慣', 'Zumba/伸展效果好'],
-    tips: '現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！',
-    color: '#88D8B0', // 溫暖薄荷綠
-    lightColor: '#F0FFF4',
-    hormone: '雌激素逐漸上升',
-    accent: '#48BB78'
-  },
-  {
-    name: '排卵期',
-    startDay: 25,
-    endDay: 27,
-    symptoms: ['下腹悶、體溫升高', '出現微水腫'],
-    diet: ['食慾微增', '有些人想吃甜'],
-    care: ['多喝水、多吃蔬菜', '補充可溶性纖維'],
-    tips: '這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。',
-    color: '#FFD166', // 溫暖黃
-    lightColor: '#FFFBEB',
-    hormone: '黃體生成素(LH)高峰',
-    accent: '#F6AD55'
-  },
-  {
-    name: '黃體期前段',
-    startDay: 28,
-    endDay: 29,
-    symptoms: ['較容易累', '情緒敏感', '水腫感變明顯'],
-    diet: ['開始嘴饞', '想吃頻率變高'],
-    care: ['早餐加蛋白質', '下午備好安全點心'],
-    tips: '提前兩天準備，比發生後補救更有效。',
-    color: '#A5A6F6', // 溫暖紫
-    lightColor: '#F3F4FF',
-    hormone: '黃體素開始上升',
-    accent: '#7F9CF5'
-  },
-  {
-    name: 'PMS 高峰',
-    startDay: 30,
-    endDay: 33,
-    symptoms: ['焦慮、情緒緊繃', '嚴重水腫、睡不好', '身心較沒安全感'],
-    diet: ['想吃甜、想吃冰', '正餐後仍想吃'],
-    care: ['補充鎂(減少焦慮)', '允許多吃 5～10%', '熱茶/小毯子/深呼吸'],
-    tips: '這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。',
-    color: '#EF476F', // 暖洋紅
-    lightColor: '#FFE5EC',
-    hormone: '黃體素高峰 / 準備下降',
-    accent: '#D6336C'
-  }
-];
-
 const SYMPTOM_OPTIONS = {
   appetite: ['低', '中', '高'],
   mood: ['穩定', '敏感/焦慮', '低落'],
@@ -125,7 +56,7 @@ const SYMPTOM_OPTIONS = {
   sleep: ['良好', '普通', '睡不好']
 };
 
-// --- 3. Helper Functions ---
+// --- 3. Helper Functions (TimeZone Fixed) ---
 
 const parseLocalDate = (dateStr: string): Date => {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -142,8 +73,6 @@ const formatLocalDate = (date: Date): string => {
 const getDaysDifference = (date1: string, date2: string): number => {
   const d1 = parseLocalDate(date1);
   const d2 = parseLocalDate(date2);
-  d1.setHours(0,0,0,0);
-  d2.setHours(0,0,0,0);
   return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
@@ -172,17 +101,89 @@ const createEmptyRecord = (date: string): SymptomRecord => ({
   notes: ''
 });
 
-const getRulesForCycle = (periodLength: number = 6): PhaseDefinition[] => {
-  const rules = JSON.parse(JSON.stringify(PHASE_RULES));
-  rules[0].endDay = periodLength;
-  rules[1].startDay = periodLength + 1;
-  return rules;
+// --- 關鍵修改：動態規則生成器 ---
+// 根據「週期總長度 (cycleLength)」和「出血天數 (periodLength)」動態計算所有階段
+// 邏輯：生理期固定 -> 濾泡期伸縮 -> 排卵期/黃體期/PMS 依據週期結束日倒推 (保持您的體質比例)
+const getRulesForCycle = (cycleLength: number, periodLength: number): PhaseDefinition[] => {
+  // 您的體質參數 (基於 34 天週期 Day 25 排卵 = 倒數第 9 天)
+  const ovulationStartFromEnd = 9; 
+  const pmsStartFromEnd = 4;
+
+  const ovulationStart = cycleLength - ovulationStartFromEnd;
+  const pmsStart = cycleLength - pmsStartFromEnd;
+
+  return [
+    {
+      name: '生理期',
+      startDay: 1,
+      endDay: periodLength,
+      symptoms: ['疲倦、想休息', '水腫慢慢消退中', '偶爾子宮悶感'],
+      diet: ['食慾偏低/正常', '想吃冰(荷爾蒙反應)'],
+      care: ['不逼自己運動', '多喝暖身飲', '早餐多一點蛋白質'],
+      tips: '這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。',
+      color: '#FF8FAB',
+      lightColor: '#FFF0F5',
+      hormone: '雌激素與黃體素低點',
+      accent: '#FB6F92'
+    },
+    {
+      name: '濾泡期 (黃金期)',
+      startDay: periodLength + 1,
+      endDay: ovulationStart - 1, // 自動伸縮填補
+      symptoms: ['精力恢復', '身體最輕盈(無水腫)', '心情平穩'],
+      diet: ['食慾最低', '最好控制', '飽足感良好'],
+      care: ['適合減脂/建立習慣', 'Zumba/伸展效果好'],
+      tips: '現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！',
+      color: '#88D8B0',
+      lightColor: '#F0FFF4',
+      hormone: '雌激素逐漸上升',
+      accent: '#48BB78'
+    },
+    {
+      name: '排卵期',
+      startDay: ovulationStart,
+      endDay: ovulationStart + 2,
+      symptoms: ['下腹悶、體溫升高', '出現微水腫'],
+      diet: ['食慾微增', '有些人想吃甜'],
+      care: ['多喝水、多吃蔬菜', '補充可溶性纖維'],
+      tips: '這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。',
+      color: '#FFD166',
+      lightColor: '#FFFBEB',
+      hormone: '黃體生成素(LH)高峰',
+      accent: '#F6AD55'
+    },
+    {
+      name: '黃體期前段',
+      startDay: ovulationStart + 3,
+      endDay: pmsStart - 1,
+      symptoms: ['較容易累', '情緒敏感', '水腫感變明顯'],
+      diet: ['開始嘴饞', '想吃頻率變高'],
+      care: ['早餐加蛋白質', '下午備好安全點心'],
+      tips: '提前兩天準備，比發生後補救更有效。',
+      color: '#A5A6F6',
+      lightColor: '#F3F4FF',
+      hormone: '黃體素開始上升',
+      accent: '#7F9CF5'
+    },
+    {
+      name: 'PMS 高峰',
+      startDay: pmsStart,
+      endDay: cycleLength,
+      symptoms: ['焦慮、情緒緊繃', '嚴重水腫、睡不好', '身心較沒安全感'],
+      diet: ['想吃甜、想吃冰', '正餐後仍想吃'],
+      care: ['補充鎂(減少焦慮)', '允許多吃 5～10%', '熱茶/小毯子/深呼吸'],
+      tips: '這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。',
+      color: '#EF476F',
+      lightColor: '#FFE5EC',
+      hormone: '黃體素高峰 / 準備下降',
+      accent: '#D6336C'
+    }
+  ];
 };
 
 // --- 4. Main Component ---
 
 const PhoebeCycleTracker: React.FC = () => {
-  // Fonts
   useEffect(() => {
     const link = document.createElement('link');
     link.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@600;700&display=swap";
@@ -191,12 +192,13 @@ const PhoebeCycleTracker: React.FC = () => {
     return () => { document.head.removeChild(link); };
   }, []);
 
-  // State
   const [history, setHistory] = useState<CycleRecord[]>(() => {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     try {
       const parsed = stored ? JSON.parse(stored) : INITIAL_HISTORY;
-      return parsed.sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
+      return parsed.sort((a: CycleRecord, b: CycleRecord) => 
+        parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime()
+      );
     } catch { return INITIAL_HISTORY; }
   });
 
@@ -221,21 +223,22 @@ const PhoebeCycleTracker: React.FC = () => {
   const [editBleedingDays, setEditBleedingDays] = useState(6);
   const [editDate, setEditDate] = useState(history[history.length - 1].startDate);
 
-  // Calculations
+  // 計算平均週期 (核心)
+  const averageCycleLength = useMemo(() => {
+    const completed = history.filter(h => h.length !== null);
+    if (completed.length === 0) return 34; // 預設值
+    const total = completed.reduce((s, h) => s + (h.length || 0), 0);
+    return Math.round(total / completed.length);
+  }, [history]);
+
   const currentCycle = history[history.length - 1];
   const lastStartDate = currentCycle.startDate;
   const currentPeriodLength = currentCycle.periodLength || 6;
 
   const daysPassed = useMemo(() => getDaysDifference(lastStartDate, todayStr) + 1, [lastStartDate, todayStr]);
 
-  const averageCycleLength = useMemo(() => {
-    const completed = history.filter(h => h.length !== null);
-    if (completed.length === 0) return 34;
-    const total = completed.reduce((s, h) => s + (h.length || 0), 0);
-    return Math.round(total / completed.length);
-  }, [history]);
-
-  const currentRules = useMemo(() => getRulesForCycle(currentPeriodLength), [currentPeriodLength]);
+  // **動態規則**：傳入平均週期長度，讓規則自動伸縮
+  const currentRules = useMemo(() => getRulesForCycle(averageCycleLength, currentPeriodLength), [averageCycleLength, currentPeriodLength]);
 
   const currentPhase = useMemo(() => {
     const found = currentRules.find(p => daysPassed >= p.startDay && daysPassed <= p.endDay);
@@ -244,11 +247,13 @@ const PhoebeCycleTracker: React.FC = () => {
   }, [daysPassed, currentRules]);
 
   const nextPeriodDate = addDays(lastStartDate, averageCycleLength);
-  const nextPMSDate = addDays(nextPeriodDate, -7);
+  const nextPMSDate = addDays(nextPeriodDate, -4); // 依據您的體質 PMS 開始於倒數第 4 天
+  
   const progressPercent = useMemo(() => Math.min(100, (daysPassed / averageCycleLength) * 100), [daysPassed, averageCycleLength]);
 
   const getSymptomRecordForDate = useCallback((dateStr: string) => symptomRecords.find(r => r.date === dateStr), [symptomRecords]);
 
+  // 日曆用的階段判斷 (支援歷史不同長度)
   const getPhaseForDate = useCallback((date: Date) => {
     const dateStr = formatLocalDate(date);
     for (let i = history.length - 2; i >= 0; i--) {
@@ -258,21 +263,23 @@ const PhoebeCycleTracker: React.FC = () => {
         const e = addDays(s, h.length - 1);
         if (dateStr >= s && dateStr <= e) {
           const day = getDaysDifference(s, dateStr) + 1;
-          const histRules = getRulesForCycle(h.periodLength || 6);
+          // 歷史紀錄使用當次實際長度來計算規則
+          const histRules = getRulesForCycle(h.length || 34, h.periodLength || 6);
           return histRules.find(p => day >= p.startDay && day <= p.endDay);
         }
       }
     }
+    // 當前週期 (尚未結束，使用平均長度預測)
     const cur = history[history.length - 1];
     if (dateStr >= cur.startDate) {
       const day = getDaysDifference(cur.startDate, dateStr) + 1;
-      const curRules = getRulesForCycle(cur.periodLength || 6);
+      const curRules = getRulesForCycle(averageCycleLength, cur.periodLength || 6);
       const found = curRules.find(p => day >= p.startDay && day <= p.endDay);
       const last = curRules[curRules.length - 1];
       return (day > last.endDay) ? last : (found || last);
     }
     return undefined;
-  }, [history]);
+  }, [history, averageCycleLength]);
 
   const generateCalendarDays = useMemo(() => {
     const start = startOfMonth(currentMonth);
@@ -297,7 +304,6 @@ const PhoebeCycleTracker: React.FC = () => {
     return days;
   }, [currentMonth]);
 
-  // Handlers
   const handleDateClick = (date: Date) => {
     const dateStr = formatLocalDate(date);
     const phase = getPhaseForDate(date);
@@ -392,34 +398,43 @@ const PhoebeCycleTracker: React.FC = () => {
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
 
-  // --- 曲線圖邏輯 ---
+  // --- 動態曲線圖邏輯 ---
+  // 根據當前的 averageCycleLength 動態繪製
   const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {
     const points: string[] = [];
-    const totalDays = 34; 
+    const totalDays = averageCycleLength; // X軸長度 = 平均週期
     const stepX = width / totalDays;
     
+    // 獲取當前長度下的規則
+    const rules = getRulesForCycle(totalDays, 6); // 假設出血 6 天畫圖，或可傳入平均出血天數
+
     for (let day = 1; day <= totalDays; day++) {
         let intensity = 50; 
         
+        // 判斷該 day 屬於哪個階段
+        const phase = rules.find(p => day >= p.startDay && day <= p.endDay) || rules[rules.length-1];
+        const phaseIndex = rules.indexOf(phase);
+
         if (type === 'appetite') {
-            if (day <= 6) intensity = 60 + 2;
-            else if (day <= 24) intensity = 90 + 2;
-            else if (day <= 27) intensity = 50 + 2;
-            else if (day <= 29) intensity = 40 + 2;
-            else intensity = 10 + 2;
+            if (phaseIndex === 0) intensity = 60 + 2; // 生理期
+            else if (phaseIndex === 1) intensity = 90 + 2; // 濾泡
+            else if (phaseIndex === 2) intensity = 50 + 2; // 排卵
+            else if (phaseIndex === 3) intensity = 40 + 2; // 黃體前
+            else intensity = 10 + 2; // PMS
         } else if (type === 'hormone') {
-            if (day <= 14) intensity = 80;
-            else if (day <= 24) intensity = 40;
-            else if (day <= 28) intensity = 20;
+            if (phaseIndex <= 1) intensity = 80;
+            else if (phaseIndex === 2) intensity = 40;
+            else if (phaseIndex === 3) intensity = 20;
             else intensity = 85;
         } else if (type === 'edema') {
             if (day <= 3) intensity = 40 - 2;
-            else if (day <= 6) intensity = 70 - 2;
-            else if (day <= 24) intensity = 95 - 2;
-            else if (day <= 27) intensity = 60 - 2;
-            else if (day <= 29) intensity = 40 - 2;
+            else if (phaseIndex === 0) intensity = 70 - 2;
+            else if (phaseIndex === 1) intensity = 95 - 2;
+            else if (phaseIndex === 2) intensity = 60 - 2;
+            else if (phaseIndex === 3) intensity = 40 - 2;
             else intensity = 10 - 2;
         }
+        
         const x = (day - 1) * stepX;
         const y = (intensity / 100) * height;
         points.push(`${x},${y}`);
@@ -427,16 +442,21 @@ const PhoebeCycleTracker: React.FC = () => {
     return points.join(' ');
   };
 
-  // 關鍵日期
-  const edemaRiseDay = 25;
-  const stressRiseDay = 28;
-  const pmsPeakDay = 30;
+  // 動態計算關鍵日期
+  const currentChartRules = getRulesForCycle(averageCycleLength, 6);
+  // 排卵期開始日 (水腫開始)
+  const edemaRiseDay = currentChartRules[2].startDay; 
+  // 黃體前段開始日 (壓力開始)
+  const stressRiseDay = currentChartRules[3].startDay; 
+  // PMS 開始日
+  const pmsPeakDay = currentChartRules[4].startDay;
+
   const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
   const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
   const pmsPeakDateStr = formatShortDate(addDays(lastStartDate, pmsPeakDay - 1));
-
-  // 用於圖表的 "今天" 位置
-  const chartDaysPassed = Math.min(Math.max(daysPassed, 1), 34);
+  
+  // 圖表 Today 指標位置 (限制在圖表範圍內)
+  const chartDaysPassed = Math.min(Math.max(daysPassed, 1), averageCycleLength);
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -497,57 +517,62 @@ const PhoebeCycleTracker: React.FC = () => {
             </div>
         </div>
         
-        <div style={{ position: 'relative', height: '140px', marginTop: '5px' }}>
-            <svg viewBox="0 0 340 140" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
+        {/* SVG Chart */}
+        <div style={{ position: 'relative', height: '140px' }}>
+            <svg viewBox={`0 0 340 140`} style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
+                {/* Grid Lines */}
                 <line x1="0" y1="35" x2="340" y2="35" stroke="#f5f5f5" strokeWidth="1" />
                 <line x1="0" y1="70" x2="340" y2="70" stroke="#f5f5f5" strokeWidth="1" />
                 <line x1="0" y1="105" x2="340" y2="105" stroke="#f5f5f5" strokeWidth="1" />
                 
-                {/* Appetite (Orange) */}
+                {/* Appetite (Orange) - Solid */}
                 <polyline points={getCurvePoints(340, 140, 'appetite')} fill="none" stroke="#F49B00" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 
-                {/* Hormone (Purple) */}
+                {/* Hormone (Purple) - Dotted */}
                 <polyline points={getCurvePoints(340, 140, 'hormone')} fill="none" stroke="#896CD9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="3,3" opacity="0.8" />
 
-                {/* Edema (Blue) */}
+                {/* Edema (Blue) - Dashed */}
                 <polyline points={getCurvePoints(340, 140, 'edema')} fill="none" stroke="#29B6F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6,4" />
 
                 {/* Today Line */}
                 <line 
-                    x1={(chartDaysPassed / 34) * 340} y1="0" 
-                    x2={(chartDaysPassed / 34) * 340} y2="140" 
+                    x1={(chartDaysPassed / averageCycleLength) * 340} y1="0" 
+                    x2={(chartDaysPassed / averageCycleLength) * 340} y2="140" 
                     stroke="#333" strokeWidth="1.5" strokeDasharray="4,2"
                 />
                 
-                {/* Critical Date Lines */}
-                <line x1={((edemaRiseDay-1) / 34) * 340} y1="0" x2={((edemaRiseDay-1) / 34) * 340} y2="140" stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
-                <line x1={((stressRiseDay-1) / 34) * 340} y1="0" x2={((stressRiseDay-1) / 34) * 340} y2="140" stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
-                <line x1={((pmsPeakDay-1) / 34) * 340} y1="0" x2={((pmsPeakDay-1) / 34) * 340} y2="140" stroke="#D6336C" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
+                {/* Critical Date Lines (Only Lines) */}
+                <line x1={((edemaRiseDay-1) / averageCycleLength) * 340} y1="0" x2={((edemaRiseDay-1) / averageCycleLength) * 340} y2="140" stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
+                <line x1={((stressRiseDay-1) / averageCycleLength) * 340} y1="0" x2={((stressRiseDay-1) / averageCycleLength) * 340} y2="140" stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
+                <line x1={((pmsPeakDay-1) / averageCycleLength) * 340} y1="0" x2={((pmsPeakDay-1) / averageCycleLength) * 340} y2="140" stroke="#D6336C" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
             </svg>
-            <div style={{ position: 'absolute', left: `calc(${(chartDaysPassed / 34) * 100}% - 14px)`, bottom: '-22px', backgroundColor: '#555', color: 'white', fontSize: '0.65rem', padding: '2px 4px', borderRadius: '4px', fontWeight: 'bold', zIndex: 5, fontFamily: 'Noto Sans TC, sans-serif' }}>今天</div>
+            {/* Today Label */}
+            <div style={{ position: 'absolute', left: `calc(${(chartDaysPassed / averageCycleLength) * 100}% - 14px)`, bottom: '-22px', backgroundColor: '#555', color: 'white', fontSize: '0.65rem', padding: '2px 4px', borderRadius: '4px', fontWeight: 'bold', zIndex: 5, fontFamily: 'Noto Sans TC, sans-serif' }}>今天</div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginTop: '28px', fontFamily:'Nunito, sans-serif' }}>
             <span>Day 1</span>
-            <span>Day 14</span>
-            <span>Day 28</span>
-            <span>Day 34</span>
+            <span>Day {Math.round(averageCycleLength/2)}</span>
+            <span>Day {averageCycleLength}</span>
         </div>
 
         {/* 關鍵日期摘要列表 */}
         <div style={{ marginTop: '20px', backgroundColor: '#fdfdfd', borderRadius: '12px', padding: '12px', border: '1px solid #f0f0f0' }}>
-            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>📅 關鍵預測日期</h4>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>📅 關鍵預測日期 (週期: {averageCycleLength}天)</h4>
+            
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '0.85rem' }}>
                 <span style={{color: '#29B6F6', fontWeight:'bold'}}>💧 水腫與食慾明顯上升</span>
-                <span style={{fontFamily:'Nunito, sans-serif'}}>{edemaRiseDateStr} (Day 25)</span>
+                <span style={{fontFamily:'Nunito, sans-serif'}}>{edemaRiseDateStr} (Day {edemaRiseDay})</span>
             </div>
+            
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '0.85rem' }}>
                 <span style={{color: '#896CD9', fontWeight:'bold'}}>💜 壓力開始明顯上升</span>
-                <span style={{fontFamily:'Nunito, sans-serif'}}>{stressRiseDateStr} (Day 28)</span>
+                <span style={{fontFamily:'Nunito, sans-serif'}}>{stressRiseDateStr} (Day {stressRiseDay})</span>
             </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
                 <span style={{color: '#D6336C', fontWeight:'bold', backgroundColor:'#FFE5EC', padding:'2px 6px', borderRadius:'4px'}}>🔥 PMS 全面高峰</span>
-                <span style={{fontFamily:'Nunito, sans-serif', fontWeight:'bold', color: '#D6336C'}}>{pmsPeakDateStr} (Day 30)</span>
+                <span style={{fontFamily:'Nunito, sans-serif', fontWeight:'bold', color: '#D6336C'}}>{pmsPeakDateStr} (Day {pmsPeakDay})</span>
             </div>
         </div>
       </div>
@@ -556,11 +581,11 @@ const PhoebeCycleTracker: React.FC = () => {
       <div style={{ ...cardStyle, marginTop: '20px' }}>
         <h3 style={cardTitleStyle}>🗓️ 週期月曆</h3>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-          <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} style={navButtonStyle}>&lt;</button>
+          <button onClick={goToPreviousMonth} style={navButtonStyle}>&lt;</button>
           <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
             {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
           </span>
-          <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} style={navButtonStyle}>&gt;</button>
+          <button onClick={goToNextMonth} style={navButtonStyle}>&gt;</button>
         </div>
 
         <div style={calendarGridStyle}>
@@ -572,9 +597,8 @@ const PhoebeCycleTracker: React.FC = () => {
             const isToday = dateStr === todayStr;
             const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
             
-            // 修正：今天使用實心深色圓形，週期使用淺色方圓
             const todayStyle = isToday ? {
-                backgroundColor: '#555', // 改成深灰色
+                backgroundColor: '#555',
                 color: 'white',
                 borderRadius: '50%',
                 fontWeight: 'bold',
@@ -722,7 +746,7 @@ const cardTitleStyle: React.CSSProperties = { fontSize: '1.1rem', borderBottom: 
 const navButtonStyle: React.CSSProperties = { background: '#f5f5f5', border: 'none', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', color: '#555', fontFamily: 'Nunito, sans-serif' };
 const calendarGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' };
 const dayNameStyle: React.CSSProperties = { textAlign: 'center', fontSize: '0.85rem', color: '#999', marginBottom: '5px' };
-const calendarDayStyle: React.CSSProperties = { minHeight: '50px', borderRadius: '8px', border: '1px solid #f5f5f5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' };
+const calendarDayStyle: React.CSSProperties = { minHeight: '50px', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' };
 const recordDotStyle: React.CSSProperties = { width: '5px', height: '5px', borderRadius: '50%', position: 'absolute', bottom: '4px', right: '4px' };
 const gridContainerStyle: React.CSSProperties = { display: 'flex', gap: '15px', flexWrap: 'wrap', marginTop: '20px' };
 const predictionLabelStyle: React.CSSProperties = { fontSize: '0.9rem', color: '#888', marginBottom: '4px' };
