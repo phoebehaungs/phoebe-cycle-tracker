@@ -1,33 +1,352 @@
+// App.tsx
 // @ts-nocheck
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
-// ==========================================
-// 1. 全局配置與樣式 (最優先讀取)
-// ==========================================
+/** =========================
+ * 0. Types (給自己看用，@ts-nocheck 下不影響 runtime)
+ * ========================= */
+type PhaseKey = 'period' | 'follicular' | 'ovulation' | 'luteal' | 'pms';
 
+type PhaseDefinition = {
+  name: string;
+  startDay: number;
+  endDay: number;
+  color: string;
+  lightColor: string;
+  accent: string;
+  hormone: string;
+  tips: string;
+  care: string[];
+  symptoms: string[];
+  diet: string[];
+};
+
+type CycleRecord = {
+  id: string;
+  startDate: string; // YYYY-MM-DD
+  length: number | null; // cycle length (computed)
+  periodLength: number; // bleeding days
+};
+
+type Appetite = string;
+type Mood = string;
+type Body = string;
+type Sleep = string;
+
+type SymptomRecord = {
+  date: string; // YYYY-MM-DD
+  appetite: Appetite;
+  mood: Mood;
+  body: Body;
+  sleep: Sleep;
+  notes: string;
+};
+
+type MentalRecord = {
+  date: string; // YYYY-MM-DD
+  anxiety: number; // 0-10
+  win: string;
+};
+
+type DateDetail = {
+  date: string;
+  day: number;
+  phase: PhaseDefinition;
+  record: SymptomRecord;
+};
+
+/** =========================
+ * 1. Storage Keys
+ * ========================= */
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
 const MENTAL_STORAGE_KEY = 'phoebeMentalRecords';
 
-// 配色方案
+/** =========================
+ * 2. Colors
+ * ========================= */
 const COLORS = {
-  primary: '#7F8CE0',   // 主藍紫色
+  primary: '#7F8CE0',
   primaryLight: '#E8EAF6',
-  accent: '#FFAD8F',    // 蜜桃珊瑚色
+  accent: '#FFAD8F',
   accentDark: '#E69A7E',
   textDark: '#333344',
   textGrey: '#7A7A9D',
-  bgApp: '#F4F5FA',     // 極淺藍灰背景
+  bgApp: '#F4F5FA',
   bgCard: '#FFFFFF',
   border: '#EBEBF4',
-  
+
   chartOrange: '#FFAD8F',
   chartPurple: '#7F8CE0',
   chartBlue: '#7FCCC3',
 };
 
-// --- 樣式定義 (確保全部都在這裡) ---
+/** =========================
+ * 3. Safe helpers（避免 localStorage/JSON 炸掉）
+ * ========================= */
+const safeGetItem = (key: string): string | null => {
+  try {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
 
+const safeJsonParse = <T,>(raw: string | null, fallback: T): T => {
+  try {
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return (parsed ?? fallback) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+/** =========================
+ * 4. Date helpers
+ * ========================= */
+const isValidYMD = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+const parseLocalDate = (dateStr: unknown): Date => {
+  if (!isValidYMD(dateStr)) return new Date();
+  const [y, m, d] = (dateStr as string).split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+const formatLocalDate = (date: Date): string => {
+  if (!date || Number.isNaN(date.getTime())) return '2025-01-01';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getDaysDifference = (date1: string, date2: string): number => {
+  const d1 = parseLocalDate(date1);
+  const d2 = parseLocalDate(date2);
+  d1.setHours(0, 0, 0, 0);
+  d2.setHours(0, 0, 0, 0);
+  return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const addDays = (dateStr: string, days: number): string => {
+  const d = parseLocalDate(dateStr);
+  d.setDate(d.getDate() + days);
+  return formatLocalDate(d);
+};
+
+const formatShortDate = (dateStr: string): string => (dateStr ? dateStr.slice(5).replace('-', '/') : '');
+
+const startOfMonth = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), 1);
+const endOfMonth = (date: Date): Date => new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+/** =========================
+ * 5. Domain data（你原本缺的就是這些）
+ * ========================= */
+
+// 初始週期歷史（你可以改成你真實的 last period start date）
+const INITIAL_HISTORY: CycleRecord[] = [
+  { id: 'seed-1', startDate: '2025-11-05', length: null, periodLength: 6 },
+  { id: 'seed-2', startDate: '2025-12-11', length: null, periodLength: 6 },
+];
+
+// 週期階段規則（會依 periodLength 動態調整第 1 段）
+const PHASE_RULES: PhaseDefinition[] = [
+  {
+    name: '生理期',
+    startDay: 1,
+    endDay: 6, // 會依 periodLength 調整
+    color: '#FF6B6B',
+    lightColor: '#FFECEC',
+    accent: '#FF6B6B',
+    hormone: '雌激素/黃體素都低，身體在重置',
+    tips: '今天的任務是「舒服」不是「完美」。',
+    care: ['溫熱飲、保暖下腹', '降低社交與工作負荷', '允許自己更慢一點'],
+    symptoms: ['可能疲倦、腰痠、怕冷', '食慾相對穩定或想吃暖食'],
+    diet: ['熱湯、蛋白質+鐵質', '少冰冷刺激', '水分足夠'],
+  },
+  {
+    name: '濾泡期',
+    startDay: 7,
+    endDay: 20,
+    color: COLORS.primary,
+    lightColor: '#EEF0FF',
+    accent: COLORS.primary,
+    hormone: '雌激素上升，精神與效率回來',
+    tips: '這段時間最適合把「重要但不急」的事處理掉。',
+    care: ['安排一點運動/走路', '早睡一點點就很加分', '做事用「節奏」不是用硬撐'],
+    symptoms: ['精神較好、腫脹感下降', '情緒比較穩'],
+    diet: ['蛋白質打底', '多蔬果與水', '咖啡因量不要飆高'],
+  },
+  {
+    name: '排卵期',
+    startDay: 21,
+    endDay: 23,
+    color: COLORS.chartBlue,
+    lightColor: '#EAF8F6',
+    accent: COLORS.chartBlue,
+    hormone: '排卵前後波動，身體轉換期',
+    tips: '敏銳、悶、腫都可能出現：不是你脆弱，是身體在轉檔。',
+    care: ['多休息、減少熬夜', '身體不舒服就降強度', '補水+電解質'],
+    symptoms: ['可能下腹悶、分泌物變多', '容易對刺激更敏感'],
+    diet: ['清爽但有飽足感', '溫熱飲', '避免太重口味'],
+  },
+  {
+    name: '黃體期',
+    startDay: 24,
+    endDay: 29,
+    color: COLORS.chartPurple,
+    lightColor: '#F2F1FF',
+    accent: COLORS.chartPurple,
+    hormone: '黃體素上升，容易水腫、疲倦',
+    tips: '提前準備「安全食物」會讓你後面少很多自責。',
+    care: ['把行程排鬆一點', '晚上放鬆儀式（熱水澡/伸展）', '鎂、熱茶、早睡'],
+    symptoms: ['水腫、胸悶或疲倦', '想吃澱粉/甜的'],
+    diet: ['蛋白質+纖維提高飽足', '少鹽少加工', '穩定吃正餐'],
+  },
+  {
+    name: 'PMS',
+    startDay: 30,
+    endDay: 34,
+    color: COLORS.accentDark,
+    lightColor: '#FFF0ED',
+    accent: COLORS.accent,
+    hormone: '波動最大，情緒/食慾/腫脹都可能變強',
+    tips: '把成功標準改成「穩住就好」。沒有失控就是勝利。',
+    care: ['降低期待、降低輸出', '把「想吃」當訊號不是罪', '需要就求助/休息'],
+    symptoms: ['容易焦躁、想吃、累', '水腫、睡不好'],
+    diet: ['可預備小點心（優格/蛋/熱湯）', '甜食用「份量策略」不是全禁止', '避免空腹太久'],
+  },
+];
+
+const PHASE_SUPPORT: Record<PhaseKey, { explanation: string; todayFocus: string; permission: string; successRule: string }> =
+  {
+    period: {
+      explanation: '你正在恢復與重置，身體需要你溫柔一點。',
+      todayFocus: '把「舒服」放第一位，能量留給最重要的事。',
+      permission: '我允許自己慢一點、弱一點、需求多一點。',
+      successRule: '有吃到正餐、有保暖、有休息到 → 就算成功。',
+    },
+    follicular: {
+      explanation: '你回到比較有能量的區段，可以做一點推進。',
+      todayFocus: '挑一件重要的事情推進 10 分鐘就好。',
+      permission: '我允許自己不用一次做到 100 分。',
+      successRule: '有開始、有收尾一件小事 → 就算成功。',
+    },
+    ovulation: {
+      explanation: '轉換期本來就容易敏感，這不是你的問題。',
+      todayFocus: '用「降低刺激」保護自己（少熬夜/少硬撐）。',
+      permission: '我允許自己今天不硬撐。',
+      successRule: '有覺察+有降載 → 就算成功。',
+    },
+    luteal: {
+      explanation: '黃體期更容易腫、累、想吃，是生理機制。',
+      todayFocus: '先把安全食物/熱飲準備好。',
+      permission: '我允許自己用更輕鬆的方法維持穩定。',
+      successRule: '有吃正餐、沒有暴衝式亂吃 → 就算成功。',
+    },
+    pms: {
+      explanation: '這段時間波動最大，你需要的是「穩」不是「狠」。',
+      todayFocus: '先穩住呼吸與節奏，再談其他。',
+      permission: '我允許自己今天把標準降到最低。',
+      successRule: '沒有失控、情緒有被接住 → 就算成功。',
+    },
+  };
+
+const SYMPTOM_OPTIONS = {
+  appetite: ['平穩', '有點想吃', '超想吃', '容易失控', '噁心沒胃口'],
+  mood: ['穩定', '低落', '焦躁', '易怒', '敏感想哭'],
+  body: ['不腫', '微腫', '明顯水腫', '胸悶', '下腹悶痛'],
+  sleep: ['好睡', '難入睡', '淺眠易醒', '睡很多還是累', '做惡夢'],
+};
+
+/** =========================
+ * 6. Logic helpers
+ * ========================= */
+const createEmptyRecord = (date: string): SymptomRecord => ({
+  date,
+  appetite: '',
+  mood: '',
+  body: '',
+  sleep: '',
+  notes: '',
+});
+
+const getRulesForCycle = (periodLength = 6): PhaseDefinition[] => {
+  const rules = JSON.parse(JSON.stringify(PHASE_RULES)) as PhaseDefinition[];
+  rules[0].endDay = Math.max(3, Math.min(10, periodLength));
+  rules[1].startDay = rules[0].endDay + 1;
+  return rules;
+};
+
+const normalizeHistory = (list: CycleRecord[]): CycleRecord[] => {
+  const sorted = [...list]
+    .filter((x): x is CycleRecord => !!x && isValidYMD(x.startDate))
+    .map((x) => ({
+      ...x,
+      periodLength: x.periodLength ?? 6,
+    }))
+    .sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const diff = getDaysDifference(sorted[i].startDate, sorted[i + 1].startDate);
+    sorted[i].length = diff > 0 ? diff : null;
+  }
+  if (sorted.length) sorted[sorted.length - 1].length = null;
+
+  return sorted.map((x) => ({ ...x, id: x.id || `${x.startDate}-${Math.random().toString(16).slice(2)}` }));
+};
+
+const findCycleIndexForDate = (history: CycleRecord[], dateStr: string): number => {
+  const sorted = normalizeHistory(history);
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (dateStr >= sorted[i].startDate) return i;
+  }
+  return -1;
+};
+
+const phaseNameToKey = (name: string): PhaseKey => {
+  if (name.includes('生理期')) return 'period';
+  if (name.includes('濾泡期')) return 'follicular';
+  if (name.includes('排卵期')) return 'ovulation';
+  if (name.includes('黃體期')) return 'luteal';
+  return 'pms';
+};
+
+// Catmull-Rom -> Bezier (for smooth curves)
+const pointsToSmoothPath = (pointsStr: string) => {
+  const pts = pointsStr
+    .trim()
+    .split(' ')
+    .map((p) => p.split(',').map(Number))
+    .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+
+  if (pts.length < 2) return '';
+  const d = [];
+  d.push(`M ${pts[0][0]} ${pts[0][1]}`);
+
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+
+    d.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`);
+  }
+  return d.join(' ');
+};
+
+/** =========================
+ * 7. Styles（你原本的 styles 全保留）
+ * ========================= */
 const appContainerStyle: React.CSSProperties = {
   maxWidth: '600px',
   margin: '0 auto',
@@ -54,7 +373,7 @@ const headerStyle: React.CSSProperties = {
 };
 
 const headerContentStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '10px' };
-const headerTitleStyle: React.CSSProperties = { fontSize: '1.5rem', margin: 0, color: COLORS.textDark, fontWeight: '800', letterSpacing:'0.05em' };
+const headerTitleStyle: React.CSSProperties = { fontSize: '1.5rem', margin: 0, color: COLORS.textDark, fontWeight: '800', letterSpacing: '0.05em' };
 
 const baseCardStyle: React.CSSProperties = {
   backgroundColor: COLORS.bgCard,
@@ -73,7 +392,7 @@ const dashboardCardStyle: React.CSSProperties = {
 
 const todayStatusContainerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '25px' };
 const todayDateStyle: React.CSSProperties = { fontSize: '2.2rem', fontWeight: '800', color: COLORS.textDark, fontFamily: 'Nunito, sans-serif', lineHeight: 1 };
-const todayLabelStyle: React.CSSProperties = { fontSize: '1rem', color: COLORS.textGrey, fontWeight: '500', marginBottom:'5px', display:'block' };
+const todayLabelStyle: React.CSSProperties = { fontSize: '1rem', color: COLORS.textGrey, fontWeight: '500', marginBottom: '5px', display: 'block' };
 
 const editCycleButtonStyle: React.CSSProperties = {
   background: COLORS.accent,
@@ -98,7 +417,7 @@ const circularChartStyle = (color: string, percent: number): React.CSSProperties
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  boxShadow: `0 8px 20px ${color}33`, 
+  boxShadow: `0 8px 20px ${color}33`,
   background: `conic-gradient(${color} ${percent}%, ${COLORS.primaryLight} ${percent}%)`,
   flexShrink: 0,
 });
@@ -115,7 +434,6 @@ const circularChartInnerStyle: React.CSSProperties = {
 };
 
 const circularChartDayStyle: React.CSSProperties = { fontSize: '3.5rem', fontWeight: '800', color: COLORS.textDark, lineHeight: 1, fontFamily: 'Nunito, sans-serif' };
-
 const statusTextStyle: React.CSSProperties = { marginLeft: '30px', textAlign: 'left', flex: 1 };
 
 const phaseTipsStyle = (lightColor: string, color: string): React.CSSProperties => ({
@@ -166,7 +484,7 @@ const careListStyle: React.CSSProperties = {
 const mentalSupportCardStyle = (color: string): React.CSSProperties => ({
   ...baseCardStyle,
   marginTop: '20px',
-  borderTop: `5px solid ${color}`, 
+  borderTop: `5px solid ${color}`,
 });
 
 const mentalTipBlockStyle = (lightColor: string, color: string): React.CSSProperties => ({
@@ -194,7 +512,7 @@ const stabilizeBlockStyle = (accent: string): React.CSSProperties => ({
   backgroundColor: '#FFF8F6',
 });
 
-const successRuleBlockStyle: React.CSSProperties = { background: COLORS.primaryLight, padding: '15px', borderRadius: '12px', lineHeight: 1.6, fontSize: '1rem', color: COLORS.textDark, fontWeight:'500' };
+const successRuleBlockStyle: React.CSSProperties = { background: COLORS.primaryLight, padding: '15px', borderRadius: '12px', lineHeight: 1.6, fontSize: '1rem', color: COLORS.textDark, fontWeight: '500' };
 const winLabelStyle: React.CSSProperties = { display: 'block', fontSize: '1rem', color: COLORS.textDark, marginBottom: 8, fontWeight: 'bold' };
 
 const recentTrendBlockStyle: React.CSSProperties = {
@@ -273,127 +591,123 @@ const todayMarkerStyle = (x: number): React.CSSProperties => ({
   fontWeight: 'bold',
   zIndex: 5,
   fontFamily: 'Noto Sans TC, sans-serif',
-  boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+  boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
 });
 
-const chartDayLabelsStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: COLORS.textGrey, marginTop: '35px', fontFamily: 'Nunito, sans-serif', fontWeight:'500' };
-
-// --- 新增的關鍵日期區塊樣式 ---
+const chartDayLabelsStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: COLORS.textGrey, marginTop: '35px', fontFamily: 'Nunito, sans-serif', fontWeight: '500' };
 
 const keyDatesCardStyle: React.CSSProperties = {
-  marginTop: "25px",
+  marginTop: '25px',
   backgroundColor: COLORS.bgCard,
-  borderRadius: "24px", 
-  padding: "24px",      
+  borderRadius: '24px',
+  padding: '24px',
   border: `1px solid ${COLORS.border}`,
-  boxShadow: "0 4px 20px rgba(0,0,0,0.03)", 
+  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
 };
 
 const keyDatesTitleStyle: React.CSSProperties = {
-  margin: "0 0 20px 0",
-  fontSize: "1.1rem",
+  margin: '0 0 20px 0',
+  fontSize: '1.1rem',
   color: COLORS.textDark,
   fontWeight: 800,
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
 };
 
 const summaryGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr 1fr",
-  gap: "10px",
-  marginBottom: "25px",
-  backgroundColor: "#F8F9FD",
-  padding: "12px",
-  borderRadius: "16px",
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr 1fr',
+  gap: '10px',
+  marginBottom: '25px',
+  backgroundColor: '#F8F9FD',
+  padding: '12px',
+  borderRadius: '16px',
 };
 
 const summaryItemStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  textAlign: "center",
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  textAlign: 'center',
 };
 
 const summaryLabelStyle: React.CSSProperties = {
-  fontSize: "0.75rem",
+  fontSize: '0.75rem',
   color: COLORS.textGrey,
-  marginBottom: "4px",
+  marginBottom: '4px',
   fontWeight: 600,
 };
 
 const summaryValueStyle: React.CSSProperties = {
-  fontSize: "0.9rem",
+  fontSize: '0.9rem',
   color: COLORS.textDark,
   fontWeight: 800,
-  fontFamily: "Nunito, sans-serif",
+  fontFamily: 'Nunito, sans-serif',
 };
 
 const phaseBlockStyle: React.CSSProperties = {
-  marginBottom: "20px",
-  borderLeft: `4px solid transparent`, 
-  paddingLeft: "0", 
+  marginBottom: '20px',
+  borderLeft: `4px solid transparent`,
+  paddingLeft: '0',
 };
 
 const phaseHeaderStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: "10px",
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: '10px',
 };
 
 const phaseBadgeStyle = (color: string, bg: string): React.CSSProperties => ({
   backgroundColor: bg,
   color: color,
-  padding: "6px 12px",
-  borderRadius: "20px",
-  fontSize: "0.9rem",
+  padding: '6px 12px',
+  borderRadius: '20px',
+  fontSize: '0.9rem',
   fontWeight: 800,
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
 });
 
 const phaseDateStyle: React.CSSProperties = {
-  textAlign: "right",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-end",
+  textAlign: 'right',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-end',
 };
 
 const dateMainStyle: React.CSSProperties = {
-  fontFamily: "Nunito, sans-serif",
+  fontFamily: 'Nunito, sans-serif',
   fontWeight: 800,
-  fontSize: "1rem",
+  fontSize: '1rem',
   color: COLORS.textDark,
 };
 
 const dateSubStyle: React.CSSProperties = {
-  fontSize: "0.75rem",
+  fontSize: '0.75rem',
   color: COLORS.textGrey,
-  fontFamily: "Nunito, sans-serif",
-  marginTop: "2px",
+  fontFamily: 'Nunito, sans-serif',
+  marginTop: '2px',
 };
 
 const tipBoxStyle: React.CSSProperties = {
-  backgroundColor: "#FFFFFF",
+  backgroundColor: '#FFFFFF',
   border: `1px dashed ${COLORS.border}`,
-  borderRadius: "12px",
-  padding: "12px 15px",
-  fontSize: "0.9rem",
-  color: "#556",
+  borderRadius: '12px',
+  padding: '12px 15px',
+  fontSize: '0.9rem',
+  color: '#556',
   lineHeight: 1.6,
-  position: "relative",
-  marginTop: "8px",
+  position: 'relative',
+  marginTop: '8px',
 };
-
-// ---
 
 const calendarCardStyle: React.CSSProperties = {
   ...baseCardStyle,
   marginTop: '25px',
-  padding: '25px'
+  padding: '25px',
 };
 
 const calendarHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: `1px solid ${COLORS.border}`, paddingBottom: '15px' };
@@ -415,6 +729,7 @@ const navButtonStyle: React.CSSProperties = {
   justifyContent: 'center',
   transition: 'background-color 0.2s',
 };
+
 const calendarGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' };
 const dayNameStyle: React.CSSProperties = { textAlign: 'center', fontSize: '0.9rem', color: COLORS.textGrey, marginBottom: '10px', fontWeight: 'bold' };
 
@@ -466,6 +781,7 @@ const recordDotStyle = (isToday: boolean, accent?: string): React.CSSProperties 
 });
 
 const gridContainerStyle: React.CSSProperties = { display: 'flex', gap: '20px', flexWrap: 'wrap', marginTop: '25px' };
+
 const predictionCardStyle = (borderColor: string): React.CSSProperties => ({
   ...baseCardStyle,
   flex: 1,
@@ -482,7 +798,8 @@ const recordInputCardStyle = (borderColor: string): React.CSSProperties => ({
   minWidth: '260px',
 });
 
-const predictionLabelStyle: React.CSSProperties = { fontSize: '0.95rem', color: COLORS.textGrey, marginBottom: '8px', fontWeight:'500' };
+const predictionLabelStyle: React.CSSProperties = { fontSize: '0.95rem', color: COLORS.textGrey, marginBottom: '8px', fontWeight: '500' };
+
 const predictionDateStyle = (color: string): React.CSSProperties => ({
   fontSize: '1.6rem',
   fontWeight: '800',
@@ -507,7 +824,7 @@ const inputStyle: React.CSSProperties = {
 const textareaStyle: React.CSSProperties = {
   ...inputStyle,
   resize: 'vertical',
-  lineHeight: '1.6'
+  lineHeight: '1.6',
 };
 
 const recordButtonStyle: React.CSSProperties = {
@@ -536,7 +853,7 @@ const modalOverlayStyle: React.CSSProperties = {
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundColor: 'rgba(51, 51, 68, 0.5)', 
+  backgroundColor: 'rgba(51, 51, 68, 0.5)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -553,17 +870,17 @@ const modalContentStyle: React.CSSProperties = {
   boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
 };
 
-const modalHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom:'20px'};
+const modalHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' };
 
 const modalCloseButtonStyle: React.CSSProperties = {
-    background: 'none',
-    border: 'none',
-    fontSize: '24px',
-    color: COLORS.textGrey,
-    cursor: 'pointer',
-    padding: '0',
-    lineHeight: 1,
-}
+  background: 'none',
+  border: 'none',
+  fontSize: '24px',
+  color: COLORS.textGrey,
+  cursor: 'pointer',
+  padding: '0',
+  lineHeight: 1,
+};
 
 const modalTitleStyle = (color: string): React.CSSProperties => ({
   color: color,
@@ -572,11 +889,11 @@ const modalTitleStyle = (color: string): React.CSSProperties => ({
   fontWeight: '800',
 });
 
-const modalPhaseDetailStyle: React.CSSProperties = { marginBottom: '10px', fontSize: '1rem', color: COLORS.textDark, display:'flex', alignItems:'center' };
-const modalCycleDayStyle: React.CSSProperties = { fontFamily: 'Nunito, sans-serif', fontWeight: '800', fontSize:'1.1rem' };
+const modalPhaseDetailStyle: React.CSSProperties = { marginBottom: '10px', fontSize: '1rem', color: COLORS.textDark, display: 'flex', alignItems: 'center' };
+const modalCycleDayStyle: React.CSSProperties = { fontFamily: 'Nunito, sans-serif', fontWeight: '800', fontSize: '1.1rem' };
 const modalRecordSectionStyle: React.CSSProperties = { marginTop: '30px', paddingTop: '25px', borderTop: `1px solid ${COLORS.border}` };
-const modalRecordTitleStyle: React.CSSProperties = { color: COLORS.textDark, marginBottom: '25px', fontSize: '1.15rem', fontWeight:'bold' };
-const modalNoteLabelStyle: React.CSSProperties = { display: 'block', fontSize: '1rem', color: COLORS.textDark, fontWeight:'bold', marginBottom:'8px' };
+const modalRecordTitleStyle: React.CSSProperties = { color: COLORS.textDark, marginBottom: '25px', fontSize: '1.15rem', fontWeight: 'bold' };
+const modalNoteLabelStyle: React.CSSProperties = { display: 'block', fontSize: '1rem', color: COLORS.textDark, fontWeight: 'bold', marginBottom: '8px' };
 const modalEditLabelStyle: React.CSSProperties = { display: 'block', margin: '20px 0 8px', fontSize: '1rem', color: COLORS.textDark, fontWeight: 'bold' };
 
 const modalButtonContainerStyle: React.CSSProperties = { marginTop: '35px' };
@@ -595,18 +912,6 @@ const modalSaveButtonStyle = (accent: string): React.CSSProperties => ({
   boxShadow: `0 4px 15px ${accent}50`,
 });
 
-const modalCancelButtonStyle: React.CSSProperties = {
-  flex: 1,
-  padding: '12px',
-  border: 'none',
-  borderRadius: '8px',
-  color: '#444',
-  fontSize: '1rem',
-  cursor: 'pointer',
-  backgroundColor: '#e0e0e0',
-  fontWeight: 'bold',
-};
-
 const dropdownButtonStyle = (isActive: boolean, accentColor: string): React.CSSProperties => ({
   padding: '8px 14px',
   borderRadius: '25px',
@@ -621,132 +926,11 @@ const dropdownButtonStyle = (isActive: boolean, accentColor: string): React.CSSP
   boxShadow: isActive ? `0 2px 8px ${accentColor}40` : 'none',
 });
 
-// ==========================================
-// 4. Helper 函式 (Helpers)
-// ==========================================
-
-const phaseNameToKey = (name: string): PhaseKey => {
-  if (name.includes('生理期')) return 'period';
-  if (name.includes('濾泡期')) return 'follicular';
-  if (name.includes('排卵期')) return 'ovulation';
-  if (name.includes('黃體期')) return 'luteal';
-  return 'pms';
-};
-
-const isValidYMD = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
-
-const parseLocalDate = (dateStr: unknown): Date => {
-  if (!isValidYMD(dateStr)) return new Date();
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
-};
-
-const formatLocalDate = (date: Date): string => {
-  if (!date || Number.isNaN(date.getTime())) return '2025-01-01';
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-const getDaysDifference = (date1: string, date2: string): number => {
-  const d1 = parseLocalDate(date1);
-  const d2 = parseLocalDate(date2);
-  d1.setHours(0, 0, 0, 0);
-  d2.setHours(0, 0, 0, 0);
-  return Math.floor((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-};
-
-const addDays = (dateStr: string, days: number): string => {
-  const d = parseLocalDate(dateStr);
-  d.setDate(d.getDate() + days);
-  return formatLocalDate(d);
-};
-
-const formatShortDate = (dateStr: string): string => (dateStr ? dateStr.slice(5).replace('-', '/') : '');
-
-const startOfMonth = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), 1);
-const endOfMonth = (date: Date): Date => new Date(date.getFullYear(), date.getMonth() + 1, 0);
-
-const createEmptyRecord = (date: string): SymptomRecord => ({
-  date,
-  appetite: '',
-  mood: '',
-  body: '',
-  sleep: '',
-  notes: '',
-});
-
-const getRulesForCycle = (periodLength = 6): PhaseDefinition[] => {
-  const rules = JSON.parse(JSON.stringify(PHASE_RULES));
-  rules[0].endDay = Math.max(3, Math.min(10, periodLength));
-  rules[1].startDay = rules[0].endDay + 1;
-  return rules;
-};
-
-const normalizeHistory = (list: CycleRecord[]): CycleRecord[] => {
-  const sorted = [...list]
-    .filter((x): x is CycleRecord => !!x && isValidYMD(x.startDate))
-    .map(x => ({
-      ...x,
-      periodLength: x.periodLength ?? 6,
-    }))
-    .sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
-
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const diff = getDaysDifference(sorted[i].startDate, sorted[i + 1].startDate);
-    sorted[i].length = diff > 0 ? diff : null;
-  }
-  if (sorted.length) sorted[sorted.length - 1].length = null;
-
-  return sorted.map(x => ({ ...x, id: x.id || `${x.startDate}-${Math.random().toString(16).slice(2)}` }));
-};
-
-const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
-
-const findCycleIndexForDate = (history: CycleRecord[], dateStr: string): number => {
-  const sorted = normalizeHistory(history);
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    if (dateStr >= sorted[i].startDate) return i;
-  }
-  return -1;
-};
-
-// Catmull-Rom -> Bezier (for smooth curves)
-const pointsToSmoothPath = (pointsStr: string) => {
-  const pts = pointsStr
-    .trim()
-    .split(" ")
-    .map((p) => p.split(",").map(Number))
-    .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
-
-  if (pts.length < 2) return "";
-
-  const d = [];
-  d.push(`M ${pts[0][0]} ${pts[0][1]}`);
-
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] || pts[i];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[i + 2] || p2;
-
-    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
-    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
-    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
-
-    d.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`);
-  }
-
-  return d.join(" ");
-};
-
-// ==========================================
-// 5. 主程式元件 (Main Component)
-// ==========================================
-
+/** =========================
+ * 8. Main component
+ * ========================= */
 const App: React.FC = () => {
+  // fonts
   useEffect(() => {
     const link = document.createElement('link');
     link.href =
@@ -768,55 +952,46 @@ const App: React.FC = () => {
   const [symptomRecords, setSymptomRecords] = useState<SymptomRecord[]>(() => {
     const stored = safeGetItem(SYMPTOM_STORAGE_KEY);
     const parsed = safeJsonParse<SymptomRecord[]>(stored, []);
-    return Array.isArray(parsed) ? parsed.filter(x => x && isValidYMD(x.date)) : [];
+    return Array.isArray(parsed) ? parsed.filter((x) => x && isValidYMD(x.date)) : [];
   });
 
   const [mentalRecords, setMentalRecords] = useState<MentalRecord[]>(() => {
     const stored = safeGetItem(MENTAL_STORAGE_KEY);
     const parsed = safeJsonParse<MentalRecord[]>(stored, []);
     return Array.isArray(parsed)
-      ? parsed.filter(x => x && isValidYMD(x.date) && typeof x.anxiety === 'number')
+      ? parsed.filter((x) => x && isValidYMD(x.date) && typeof x.anxiety === 'number')
       : [];
   });
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-        localStorage.setItem(MENTAL_STORAGE_KEY, JSON.stringify(mentalRecords));
-    }
+    if (typeof window !== 'undefined') localStorage.setItem(MENTAL_STORAGE_KEY, JSON.stringify(mentalRecords));
   }, [mentalRecords]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(history));
+  }, [history]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords));
+  }, [symptomRecords]);
 
   const getMentalForDate = useCallback(
     (dateStr: string): MentalRecord => {
-      const found = mentalRecords.find(r => r.date === dateStr);
+      const found = mentalRecords.find((r) => r.date === dateStr);
       return found ?? { date: dateStr, anxiety: 0, win: '' };
     },
     [mentalRecords]
   );
 
-  const upsertMentalForDate = useCallback(
-    (next: MentalRecord) => {
-      setMentalRecords(prev => {
-        const idx = prev.findIndex(r => r.date === next.date);
-        const copy = [...prev];
-        if (idx >= 0) copy[idx] = next;
-        else copy.push(next);
-        return copy;
-      });
-    },
-    []
-  );
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(history));
-    }
-  }, [history]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-        localStorage.setItem(SYMPTOM_STORAGE_KEY, JSON.stringify(symptomRecords));
-    }
-  }, [symptomRecords]);
+  const upsertMentalForDate = useCallback((next: MentalRecord) => {
+    setMentalRecords((prev) => {
+      const idx = prev.findIndex((r) => r.date === next.date);
+      const copy = [...prev];
+      if (idx >= 0) copy[idx] = next;
+      else copy.push(next);
+      return copy;
+    });
+  }, []);
 
   const [todayStr, setTodayStr] = useState<string>(formatLocalDate(new Date()));
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
@@ -835,8 +1010,7 @@ const App: React.FC = () => {
   const lastHistoryItem = history[history.length - 1] ?? normalizeHistory(INITIAL_HISTORY).slice(-1)[0];
   const [editDate, setEditDate] = useState<string>(lastHistoryItem.startDate);
 
-  // --- Calculations ---
-
+  // current cycle
   const currentCycle = lastHistoryItem;
   const lastStartDate = currentCycle.startDate;
   const currentPeriodLength = currentCycle.periodLength ?? 6;
@@ -844,7 +1018,7 @@ const App: React.FC = () => {
   const daysPassed = useMemo(() => getDaysDifference(lastStartDate, todayStr) + 1, [lastStartDate, todayStr]);
 
   const averageCycleLength = useMemo(() => {
-    const completed = history.filter(h => typeof h.length === 'number' && h.length !== null && h.length > 0);
+    const completed = history.filter((h) => typeof h.length === 'number' && h.length !== null && h.length > 0);
     if (completed.length === 0) return 34;
     const total = completed.reduce((s, h) => s + (h.length ?? 0), 0);
     return clamp(Math.round(total / completed.length), 21, 60);
@@ -853,20 +1027,21 @@ const App: React.FC = () => {
   const currentRules = useMemo(() => getRulesForCycle(currentPeriodLength), [currentPeriodLength]);
 
   const currentPhase = useMemo(() => {
-    const found = currentRules.find(p => daysPassed >= p.startDay && daysPassed <= p.endDay);
+    const found = currentRules.find((p) => daysPassed >= p.startDay && daysPassed <= p.endDay);
     const last = currentRules[currentRules.length - 1];
     return daysPassed > last.endDay ? last : found ?? last;
   }, [daysPassed, currentRules]);
 
   const phaseKey = useMemo(() => phaseNameToKey(currentPhase.name), [currentPhase.name]);
   const support = useMemo(() => PHASE_SUPPORT[phaseKey] || PHASE_SUPPORT.period, [phaseKey]);
+
   const todayMental = useMemo(() => getMentalForDate(todayStr), [getMentalForDate, todayStr]);
   const showStabilize = todayMental.anxiety >= 7;
 
   // 最近 7 天不安指數趨勢
   const recentAnxietySeries = useMemo(() => {
     const days = Array.from({ length: 7 }, (_, i) => addDays(todayStr, -(6 - i)));
-    return days.map(d => {
+    return days.map((d) => {
       const rec = getMentalForDate(d);
       return { date: d, anxiety: clamp(Number(rec.anxiety) || 0, 0, 10) };
     });
@@ -900,22 +1075,24 @@ const App: React.FC = () => {
   const progressPercent = useMemo(() => Math.min(100, (daysPassed / averageCycleLength) * 100), [daysPassed, averageCycleLength]);
 
   const getSymptomRecordForDate = useCallback(
-    (dateStr: string) => symptomRecords.find(r => r.date === dateStr),
+    (dateStr: string) => symptomRecords.find((r) => r.date === dateStr),
     [symptomRecords]
   );
 
+  // ⚠️ 修正：用 sorted history 來取 cycleStart，避免 index 對不上
   const getPhaseForDate = useCallback(
     (date: Date): PhaseDefinition | undefined => {
       const dateStr = formatLocalDate(date);
-      const idx = findCycleIndexForDate(history, dateStr);
+      const sorted = normalizeHistory(history);
+      const idx = findCycleIndexForDate(sorted, dateStr);
       if (idx === -1) return undefined;
 
-      const cycleStart = history[idx].startDate;
+      const cycleStart = sorted[idx].startDate;
       const day = getDaysDifference(cycleStart, dateStr) + 1;
       if (day <= 0) return undefined;
 
-      const rules = getRulesForCycle(history[idx].periodLength ?? 6);
-      const found = rules.find(p => day >= p.startDay && day <= p.endDay);
+      const rules = getRulesForCycle(sorted[idx].periodLength ?? 6);
+      const found = rules.find((p) => day >= p.startDay && day <= p.endDay);
       const last = rules[rules.length - 1];
       return day > last.endDay ? last : found ?? last;
     },
@@ -948,16 +1125,16 @@ const App: React.FC = () => {
     return days;
   }, [currentMonth]);
 
-  // --- Handlers ---
-
   const handleDateClick = (date: Date) => {
     const dateStr = formatLocalDate(date);
     const phase = getPhaseForDate(date);
     if (!phase) return;
 
-    const idx = findCycleIndexForDate(history, dateStr);
+    const sorted = normalizeHistory(history);
+    const idx = findCycleIndexForDate(sorted, dateStr);
     if (idx === -1) return;
-    const cycleStart = history[idx].startDate;
+
+    const cycleStart = sorted[idx].startDate;
     const cycleDay = getDaysDifference(cycleStart, dateStr) + 1;
     if (cycleDay <= 0) return;
 
@@ -971,9 +1148,9 @@ const App: React.FC = () => {
   const handleSaveSymptomRecord = () => {
     if (!currentRecord) return;
     const date = currentRecord.date;
-    const idx = symptomRecords.findIndex(r => r.date === date);
+    const idx = symptomRecords.findIndex((r) => r.date === date);
 
-    const isBlank = Object.values(currentRecord).slice(1).every(v => v === '');
+    const isBlank = Object.values(currentRecord).slice(1).every((v) => v === '');
     const newRecords = [...symptomRecords];
 
     if (isBlank) {
@@ -993,7 +1170,7 @@ const App: React.FC = () => {
     const newDateStr = inputDate;
     const newDateObj = parseLocalDate(newDateStr);
 
-    const monthIndex = history.findIndex(h => {
+    const monthIndex = history.findIndex((h) => {
       const hDate = parseLocalDate(h.startDate);
       return hDate.getFullYear() === newDateObj.getFullYear() && hDate.getMonth() === newDateObj.getMonth();
     });
@@ -1061,8 +1238,7 @@ const App: React.FC = () => {
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
 
-  // --- Chart Logic ---
-
+  // Chart logic
   const totalDaysForChart = 34;
   const xForDay = (day: number, width: number) => ((day - 1) / (totalDaysForChart - 1)) * width;
   const xForDayPercent = (day: number) => ((day - 1) / (totalDaysForChart - 1)) * 100;
@@ -1072,10 +1248,7 @@ const App: React.FC = () => {
   const segment = (day: number, d0: number, d1: number) => clamp01((day - d0) / (d1 - d0));
   const smoothstep = (t: number) => t * t * (3 - 2 * t);
 
-  const getIntensity = (
-    day: number,
-    type: 'appetite' | 'stress' | 'edema'
-  ) => {
+  const getIntensity = (day: number, type: 'appetite' | 'stress' | 'edema') => {
     if (type === 'appetite') {
       if (day <= 6) return 55;
       if (day <= 20) return lerp(45, 35, smoothstep(segment(day, 7, 20)));
@@ -1093,7 +1266,6 @@ const App: React.FC = () => {
       return 80;
     }
 
-    // stress
     if (day <= 10) return lerp(45, 35, smoothstep(segment(day, 1, 10)));
     if (day <= 24) return lerp(35, 40, smoothstep(segment(day, 10, 24)));
     if (day <= 29) return lerp(40, 60, smoothstep(segment(day, 24, 29)));
@@ -1101,11 +1273,7 @@ const App: React.FC = () => {
     return 85;
   };
 
-  const getCurvePoints = (
-    width: number,
-    height: number,
-    type: 'appetite' | 'stress' | 'edema'
-  ) => {
+  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'stress' | 'edema') => {
     const points: string[] = [];
     for (let day = 1; day <= totalDaysForChart; day++) {
       const intensity = getIntensity(day, type);
@@ -1124,25 +1292,23 @@ const App: React.FC = () => {
   const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
   const pmsPeakDateStr = formatShortDate(addDays(lastStartDate, pmsPeakDay - 1));
 
-  // 用於圖表的 "今天" 位置
   const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
 
-  // 計算排卵期、黃體期、PMS 的開始結束日 (用於卡片顯示)
   const ovulationStartDay = 21;
   const ovulationEndDay = 23;
   const lutealStartDay = 24;
   const pmsStartDay = 30;
 
-  // 讓 Key Date Text 物件化，方便管理
-  const keyDatesText = useMemo(() => ({
-    edemaRiseDateStr,
-    stressRiseDateStr,
-    pmsPeakDateStr
-  }), [edemaRiseDateStr, stressRiseDateStr, pmsPeakDateStr]);
+  const keyDatesText = useMemo(
+    () => ({
+      edemaRiseDateStr,
+      stressRiseDateStr,
+      pmsPeakDateStr,
+    }),
+    [edemaRiseDateStr, stressRiseDateStr, pmsPeakDateStr]
+  );
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
-
-  // --- Render ---
 
   return (
     <div style={appContainerStyle}>
@@ -1160,10 +1326,8 @@ const App: React.FC = () => {
       <div style={dashboardCardStyle}>
         <div style={todayStatusContainerStyle}>
           <div>
-             <span style={todayLabelStyle}>{parseLocalDate(todayStr).toLocaleDateString('zh-TW', { month: 'long' })}</span>
-             <div style={todayDateStyle}>
-              {parseLocalDate(todayStr).getDate()}日
-            </div>
+            <span style={todayLabelStyle}>{parseLocalDate(todayStr).toLocaleDateString('zh-TW', { month: 'long' })}</span>
+            <div style={todayDateStyle}>{parseLocalDate(todayStr).getDate()}日</div>
           </div>
           <button
             onClick={() => {
@@ -1179,7 +1343,7 @@ const App: React.FC = () => {
         <div style={circularChartContainerStyle}>
           <div style={circularChartStyle(currentPhase.color, progressPercent)}>
             <div style={circularChartInnerStyle}>
-              <div style={{ fontSize: '0.9rem', color: COLORS.textGrey, fontWeight:'bold' }}>Cycle Day</div>
+              <div style={{ fontSize: '0.9rem', color: COLORS.textGrey, fontWeight: 'bold' }}>Cycle Day</div>
               <div style={circularChartDayStyle}>{daysPassed}</div>
             </div>
           </div>
@@ -1188,9 +1352,10 @@ const App: React.FC = () => {
             <div style={{ color: COLORS.textGrey, fontSize: '0.95rem', marginTop: '4px', fontWeight: '500' }}>{currentPhase.hormone}</div>
           </div>
         </div>
-        
+
         <div style={phaseTipsStyle(currentPhase.lightColor, currentPhase.color)}>
-              💡 <b>貼心提醒：</b>{currentPhase.tips}
+          💡 <b>貼心提醒：</b>
+          {currentPhase.tips}
         </div>
 
         <div style={cardStyle(COLORS.border, 'transparent')}>
@@ -1203,18 +1368,18 @@ const App: React.FC = () => {
         <h3 style={cardTitleStyle(COLORS.textDark, false)}>🧠 今天的精神穩定站</h3>
 
         <div style={mentalTipBlockStyle(currentPhase.lightColor, currentPhase.color)}>
-          <div style={{ fontWeight: 'bold', color: currentPhase.color, marginBottom: 8, fontSize:'1.1rem' }}>
-            {currentPhase.name} 的你
-          </div>
-          <div style={{marginBottom: '8px'}}>• {support.explanation}</div>
+          <div style={{ fontWeight: 'bold', color: currentPhase.color, marginBottom: 8, fontSize: '1.1rem' }}>{currentPhase.name} 的你</div>
+          <div style={{ marginBottom: '8px' }}>• {support.explanation}</div>
           <div style={{ marginTop: 12 }}>✅ <b>今天只要做一件事：</b>{support.todayFocus}</div>
           <div style={{ marginTop: 8 }}>🫶 <b>我允許自己：</b>{support.permission}</div>
         </div>
 
         <div style={{ marginTop: 20, padding: '0 5px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom:'5px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
             <div style={{ fontWeight: 'bold', color: COLORS.textDark }}>不安指數 (0-10)</div>
-            <div style={{ fontFamily: 'Nunito, sans-serif', fontWeight: '800', fontSize: '1.4rem', color: todayMental.anxiety >= 7 ? COLORS.accent : COLORS.primary }}>{todayMental.anxiety}</div>
+            <div style={{ fontFamily: 'Nunito, sans-serif', fontWeight: '800', fontSize: '1.4rem', color: todayMental.anxiety >= 7 ? COLORS.accent : COLORS.primary }}>
+              {todayMental.anxiety}
+            </div>
           </div>
 
           <input
@@ -1222,35 +1387,20 @@ const App: React.FC = () => {
             min={0}
             max={10}
             value={todayMental.anxiety}
-            onChange={e =>
-              upsertMentalForDate({ ...todayMental, anxiety: Number(e.target.value) })
-            }
+            onChange={(e) => upsertMentalForDate({ ...todayMental, anxiety: Number(e.target.value) })}
             style={rangeInputStyle}
           />
 
-          {/* 最近 7 天不安指數趨勢 */}
           <div style={recentTrendBlockStyle}>
             <div style={recentTrendHeaderStyle}>
               <div style={{ fontWeight: 'bold', color: COLORS.textDark }}>📈 最近 7 天不安指數趨勢</div>
-              <div style={{ fontFamily: 'Nunito, sans-serif', color: COLORS.textGrey, fontWeight: 700 }}>
-                平均 {recentAvg}
-              </div>
+              <div style={{ fontFamily: 'Nunito, sans-serif', color: COLORS.textGrey, fontWeight: 700 }}>平均 {recentAvg}</div>
             </div>
 
             <div style={sparklineWrapStyle}>
               <svg viewBox="0 0 320 70" style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
-                {/* 基準線 */}
                 <line x1="0" y1="35" x2="320" y2="35" stroke={COLORS.border} strokeWidth="1" opacity="0.8" />
-                {/* 趨勢線 */}
-                <polyline
-                  points={sparkPoints}
-                  fill="none"
-                  stroke={COLORS.primary}
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                {/* 點點 */}
+                <polyline points={sparkPoints} fill="none" stroke={COLORS.primary} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                 {recentAnxietySeries.map((p, idx) => {
                   const x = 10 + (idx / (recentAnxietySeries.length - 1)) * (320 - 20);
                   const y = 10 + ((10 - p.anxiety) / 10) * (70 - 20);
@@ -1260,19 +1410,13 @@ const App: React.FC = () => {
             </div>
 
             <div style={recentListStyle}>
-              {recentAnxietySeries.map(p => (
+              {recentAnxietySeries.map((p) => (
                 <div key={p.date} style={recentRowStyle}>
-                  <span style={{ width: 54, fontFamily: 'Nunito, sans-serif', color: COLORS.textGrey, fontWeight: 700 }}>
-                    {formatShortDate(p.date)}
-                  </span>
-
+                  <span style={{ width: 54, fontFamily: 'Nunito, sans-serif', color: COLORS.textGrey, fontWeight: 700 }}>{formatShortDate(p.date)}</span>
                   <div style={recentBarTrackStyle}>
                     <div style={recentBarFillStyle((p.anxiety / 10) * 100)} />
                   </div>
-
-                  <span style={{ width: 28, textAlign: 'right', fontFamily: 'Nunito, sans-serif', fontWeight: 800 }}>
-                    {p.anxiety}
-                  </span>
+                  <span style={{ width: 28, textAlign: 'right', fontFamily: 'Nunito, sans-serif', fontWeight: 800 }}>{p.anxiety}</span>
                 </div>
               ))}
             </div>
@@ -1280,8 +1424,8 @@ const App: React.FC = () => {
 
           {showStabilize && (
             <div style={stabilizeBlockStyle(COLORS.accent)}>
-              <div style={{ fontWeight: 'bold', marginBottom: 8, color: COLORS.accentDark, display:'flex', alignItems:'center' }}>
-                 <span style={{fontSize:'1.2rem', marginRight:'5px'}}>🚨</span> 穩住我（現在先不用解決全部）
+              <div style={{ fontWeight: 'bold', marginBottom: 8, color: COLORS.accentDark, display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.2rem', marginRight: '5px' }}>🚨</span> 穩住我（現在先不用解決全部）
               </div>
               <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, fontSize: '0.95rem', color: COLORS.textDark }}>
                 <li>我現在的狀態是：{support.explanation}</li>
@@ -1297,12 +1441,10 @@ const App: React.FC = () => {
           <div style={successRuleBlockStyle}>{support.successRule}</div>
 
           <div style={{ marginTop: 20 }}>
-            <label style={winLabelStyle}>
-              ✍️ 我做得好的事（寫一句就好）
-            </label>
+            <label style={winLabelStyle}>✍️ 我做得好的事（寫一句就好）</label>
             <input
               value={todayMental.win}
-              onChange={e => upsertMentalForDate({ ...todayMental, win: e.target.value })}
+              onChange={(e) => upsertMentalForDate({ ...todayMental, win: e.target.value })}
               placeholder="例如：我有吃正餐 / 我沒有暴食 / 我有停下來呼吸"
               style={inputStyle}
             />
@@ -1314,28 +1456,24 @@ const App: React.FC = () => {
         <div style={chartHeaderStyle}>
           <h3 style={cardTitleStyle(COLORS.textDark, false)}>📉 週期趨勢分析</h3>
           <div style={chartLegendStyle}>
-            <span style={{ color: COLORS.chartOrange, fontWeight:'bold' }}>● 食慾</span>
-            <span style={{ color: COLORS.chartPurple, fontWeight:'bold' }}>● 壓力</span>
-            <span style={{ color: COLORS.chartBlue, fontWeight:'bold' }}>● 水腫</span>
+            <span style={{ color: COLORS.chartOrange, fontWeight: 'bold' }}>● 食慾</span>
+            <span style={{ color: COLORS.chartPurple, fontWeight: 'bold' }}>● 壓力</span>
+            <span style={{ color: COLORS.chartBlue, fontWeight: 'bold' }}>● 水腫</span>
           </div>
         </div>
 
-        <div style={{ position: 'relative', height: '150px', marginTop:'10px' }}>
+        <div style={{ position: 'relative', height: '150px', marginTop: '10px' }}>
           <svg viewBox="0 0 340 150" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
-            {/* Grid Lines */}
-            <line x1="0" y1="37.5" x2="340" y2="37.5" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
-            <line x1="0" y1="75" x2="340" y2="75" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
-            <line x1="0" y1="112.5" x2="340" y2="112.5" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
+            <line x1="0" y1="37.5" x2="340" y2="37.5" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4" />
+            <line x1="0" y1="75" x2="340" y2="75" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4" />
+            <line x1="0" y1="112.5" x2="340" y2="112.5" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4" />
 
-            {/* Data Lines */}
             <path d={pointsToSmoothPath(getCurvePoints(340, 150, 'appetite'))} fill="none" stroke={COLORS.chartOrange} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             <path d={pointsToSmoothPath(getCurvePoints(340, 150, 'stress'))} fill="none" stroke={COLORS.chartPurple} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
             <path d={pointsToSmoothPath(getCurvePoints(340, 150, 'edema'))} fill="none" stroke={COLORS.chartBlue} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
-            {/* Today Marker */}
             <line x1={xForDay(chartDaysPassed, 340)} y1="0" x2={xForDay(chartDaysPassed, 340)} y2="150" stroke={COLORS.textDark} strokeWidth="2" strokeDasharray="4,2" />
 
-            {/* Critical Events */}
             <line x1={xForDay(ovulationStartDay, 340)} y1="0" x2={xForDay(ovulationStartDay, 340)} y2="150" stroke={COLORS.chartBlue} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.5" />
             <line x1={xForDay(lutealStartDay, 340)} y1="0" x2={xForDay(lutealStartDay, 340)} y2="150" stroke={COLORS.chartPurple} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.5" />
             <line x1={xForDay(pmsPeakDay, 340)} y1="0" x2={xForDay(pmsPeakDay, 340)} y2="150" stroke={COLORS.accent} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.8" />
@@ -1351,19 +1489,17 @@ const App: React.FC = () => {
           <span>Day 34</span>
         </div>
 
-        {/* ---------------- 修改後的週期關鍵窗口區塊 ---------------- */}
         <div style={keyDatesCardStyle}>
           <h4 style={keyDatesTitleStyle}>
             <span>📅</span> 週期關鍵窗口（提醒你準備，不是用來責備自己）
           </h4>
 
-          {/* 頂部摘要：三欄式設計 */}
           <div style={summaryGridStyle}>
             <div style={summaryItemStyle}>
               <span style={summaryLabelStyle}>💧 水腫起點</span>
               <span style={summaryValueStyle}>{keyDatesText.edemaRiseDateStr}</span>
             </div>
-            <div style={{...summaryItemStyle, borderLeft:`1px solid ${COLORS.border}`, borderRight:`1px solid ${COLORS.border}`}}>
+            <div style={{ ...summaryItemStyle, borderLeft: `1px solid ${COLORS.border}`, borderRight: `1px solid ${COLORS.border}` }}>
               <span style={summaryLabelStyle}>💜 壓力起點</span>
               <span style={summaryValueStyle}>{keyDatesText.stressRiseDateStr}</span>
             </div>
@@ -1373,12 +1509,9 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* 1. 排卵窗口 */}
           <div style={phaseBlockStyle}>
             <div style={phaseHeaderStyle}>
-              <span style={phaseBadgeStyle(COLORS.chartBlue, '#EAF8F6')}>
-                🥚 排卵期
-              </span>
+              <span style={phaseBadgeStyle(COLORS.chartBlue, '#EAF8F6')}>🥚 排卵期</span>
               <div style={phaseDateStyle}>
                 <span style={dateMainStyle}>
                   {formatShortDate(addDays(lastStartDate, ovulationStartDay - 1))} - {formatShortDate(addDays(lastStartDate, ovulationEndDay - 1))}
@@ -1387,63 +1520,52 @@ const App: React.FC = () => {
               </div>
             </div>
             <div style={tipBoxStyle}>
-              此時若感到悶、腫或敏銳，是身體轉換期的自然反應，<span style={{color: COLORS.chartBlue, fontWeight: 'bold'}}>不用硬撐</span>。
+              此時若感到悶、腫或敏銳，是身體轉換期的自然反應，<span style={{ color: COLORS.chartBlue, fontWeight: 'bold' }}>不用硬撐</span>。
             </div>
           </div>
 
-          {/* 2. 黃體期開始 */}
           <div style={phaseBlockStyle}>
             <div style={phaseHeaderStyle}>
-              <span style={phaseBadgeStyle(COLORS.chartPurple, '#F2F1FF')}>
-                🌙 黃體期
-              </span>
+              <span style={phaseBadgeStyle(COLORS.chartPurple, '#F2F1FF')}>🌙 黃體期</span>
               <div style={phaseDateStyle}>
-                <span style={dateMainStyle}>
-                  {formatShortDate(addDays(lastStartDate, lutealStartDay - 1))} 起
-                </span>
+                <span style={dateMainStyle}>{formatShortDate(addDays(lastStartDate, lutealStartDay - 1))} 起</span>
                 <span style={dateSubStyle}>Day {lutealStartDay}</span>
               </div>
             </div>
             <div style={tipBoxStyle}>
-              提前備好 <span style={{color: COLORS.chartPurple, fontWeight: 'bold'}}>安全點心、熱茶、鎂、早睡</span>，比事後補救更輕鬆。
+              提前備好 <span style={{ color: COLORS.chartPurple, fontWeight: 'bold' }}>安全點心、熱茶、鎂、早睡</span>，比事後補救更輕鬆。
             </div>
           </div>
 
-          {/* 3. PMS 區塊 */}
-          <div style={{...phaseBlockStyle, marginBottom: 0}}>
+          <div style={{ ...phaseBlockStyle, marginBottom: 0 }}>
             <div style={phaseHeaderStyle}>
-              <span style={phaseBadgeStyle(COLORS.accentDark, '#FFF0ED')}>
-                🔥 PMS
-              </span>
+              <span style={phaseBadgeStyle(COLORS.accentDark, '#FFF0ED')}>🔥 PMS</span>
               <div style={phaseDateStyle}>
-                <span style={dateMainStyle}>
-                  {formatShortDate(addDays(lastStartDate, pmsStartDay - 1))} 起
-                </span>
+                <span style={dateMainStyle}>{formatShortDate(addDays(lastStartDate, pmsStartDay - 1))} 起</span>
                 <span style={dateSubStyle}>Day {pmsStartDay}</span>
               </div>
             </div>
-            <div style={{...tipBoxStyle, border: `1px solid ${COLORS.accent}40`, backgroundColor: '#FFF9F7'}}>
-              將成功標準改成 <span style={{color: COLORS.accentDark, fontWeight: 'bold'}}>「穩住就好」</span>。沒有失控，就是巨大的成功。
+            <div style={{ ...tipBoxStyle, border: `1px solid ${COLORS.accent}40`, backgroundColor: '#FFF9F7' }}>
+              將成功標準改成 <span style={{ color: COLORS.accentDark, fontWeight: 'bold' }}>「穩住就好」</span>。沒有失控，就是巨大的成功。
             </div>
           </div>
         </div>
-        {/* ---------------- 修改結束 ---------------- */}
       </div>
 
       <div style={calendarCardStyle}>
         <div style={calendarHeaderStyle}>
-            <h3 style={cardTitleStyle(COLORS.textDark, false)}>🗓️ 週期月曆</h3>
-            <div style={calendarNavStyle}>
-            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} style={navButtonStyle}>
-                &lt;
+          <h3 style={cardTitleStyle(COLORS.textDark, false)}>🗓️ 週期月曆</h3>
+          <div style={calendarNavStyle}>
+            <button onClick={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} style={navButtonStyle}>
+              &lt;
             </button>
             <span style={monthTitleStyle}>
-                {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
+              {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
             </span>
-            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} style={navButtonStyle}>
-                &gt;
+            <button onClick={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} style={navButtonStyle}>
+              &gt;
             </button>
-            </div>
+          </div>
         </div>
 
         <div style={calendarGridStyle}>
@@ -1461,15 +1583,9 @@ const App: React.FC = () => {
             const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
 
             return (
-              <div
-                key={i}
-                onClick={() => handleDateClick(date)}
-                style={calendarDayStyle(isCurrentMonth, isToday, phase)}
-              >
+              <div key={i} onClick={() => handleDateClick(date)} style={calendarDayStyle(isCurrentMonth, isToday, phase)}>
                 <div style={calendarDayNumberStyle(isToday, isCurrentMonth)}>{date.getDate()}</div>
-                {!isToday && phase && (
-                  <div style={phaseDotStyle(phase.color)} />
-                )}
+                {!isToday && phase && <div style={phaseDotStyle(phase.color)} />}
                 {record && <div style={recordDotStyle(isToday, phase?.accent)} />}
               </div>
             );
@@ -1492,7 +1608,7 @@ const App: React.FC = () => {
 
         <div style={recordInputCardStyle(COLORS.accent)}>
           <h3 style={cardTitleStyle(COLORS.textDark, false)}>這次生理期第一天</h3>
-          <input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} style={inputStyle} />
+          <input type="date" value={inputDate} onChange={(e) => setInputDate(e.target.value)} style={inputStyle} />
           <button onClick={handleUpsertPeriodRecord} style={recordButtonStyle}>
             確認日期
           </button>
@@ -1514,26 +1630,28 @@ const App: React.FC = () => {
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
             <div style={modalHeaderStyle}>
-                <h3 style={modalTitleStyle(modalDetail.phase.color)}>{modalDetail.date}</h3>
-                <button onClick={() => setModalDetail(null)} style={modalCloseButtonStyle}>×</button>
+              <h3 style={modalTitleStyle(modalDetail.phase.color)}>{modalDetail.date}</h3>
+              <button onClick={() => setModalDetail(null)} style={modalCloseButtonStyle}>
+                ×
+              </button>
             </div>
             <p style={modalPhaseDetailStyle}>
               週期日: <strong style={modalCycleDayStyle}>Day {modalDetail.day}</strong>
-              <span style={{margin:'0 8px', color:COLORS.border}}>|</span>
+              <span style={{ margin: '0 8px', color: COLORS.border }}>|</span>
               階段: <strong style={{ color: modalDetail.phase.color }}>{modalDetail.phase.name}</strong>
             </p>
 
             <div style={modalRecordSectionStyle}>
               <h4 style={modalRecordTitleStyle}>📝 每日紀錄</h4>
 
-              <RecordDropdown label="食慾" options={SYMPTOM_OPTIONS.appetite} value={currentRecord.appetite} onChange={v => setCurrentRecord({ ...currentRecord, appetite: v as Appetite })} accentColor={modalDetail.phase.accent} />
-              <RecordDropdown label="心情" options={SYMPTOM_OPTIONS.mood} value={currentRecord.mood} onChange={v => setCurrentRecord({ ...currentRecord, mood: v as Mood })} accentColor={modalDetail.phase.accent} />
-              <RecordDropdown label="水腫" options={SYMPTOM_OPTIONS.body} value={currentRecord.body} onChange={v => setCurrentRecord({ ...currentRecord, body: v as Body })} accentColor={modalDetail.phase.accent} />
-              <RecordDropdown label="睡眠" options={SYMPTOM_OPTIONS.sleep} value={currentRecord.sleep} onChange={v => setCurrentRecord({ ...currentRecord, sleep: v as Sleep })} accentColor={modalDetail.phase.accent} />
+              <RecordDropdown label="食慾" options={SYMPTOM_OPTIONS.appetite} value={currentRecord.appetite} onChange={(v) => setCurrentRecord({ ...currentRecord, appetite: v as Appetite })} accentColor={modalDetail.phase.accent} />
+              <RecordDropdown label="心情" options={SYMPTOM_OPTIONS.mood} value={currentRecord.mood} onChange={(v) => setCurrentRecord({ ...currentRecord, mood: v as Mood })} accentColor={modalDetail.phase.accent} />
+              <RecordDropdown label="水腫" options={SYMPTOM_OPTIONS.body} value={currentRecord.body} onChange={(v) => setCurrentRecord({ ...currentRecord, body: v as Body })} accentColor={modalDetail.phase.accent} />
+              <RecordDropdown label="睡眠" options={SYMPTOM_OPTIONS.sleep} value={currentRecord.sleep} onChange={(v) => setCurrentRecord({ ...currentRecord, sleep: v as Sleep })} accentColor={modalDetail.phase.accent} />
 
               <div style={{ marginTop: '15px' }}>
                 <label style={modalNoteLabelStyle}>備註：</label>
-                <textarea value={currentRecord.notes} onChange={e => setCurrentRecord({ ...currentRecord, notes: e.target.value })} rows={3} style={textareaStyle} />
+                <textarea value={currentRecord.notes} onChange={(e) => setCurrentRecord({ ...currentRecord, notes: e.target.value })} rows={3} style={textareaStyle} />
               </div>
             </div>
 
@@ -1550,18 +1668,20 @@ const App: React.FC = () => {
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
             <div style={modalHeaderStyle}>
-                <h3 style={modalTitleStyle(COLORS.accent)}>📅 修改本次週期</h3>
-                <button onClick={() => setEditMode(false)} style={modalCloseButtonStyle}>×</button>
+              <h3 style={modalTitleStyle(COLORS.accent)}>📅 修改本次週期</h3>
+              <button onClick={() => setEditMode(false)} style={modalCloseButtonStyle}>
+                ×
+              </button>
             </div>
-            
+
             <label style={modalEditLabelStyle}>開始日期</label>
-            <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={inputStyle} />
-            
+            <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} style={inputStyle} />
+
             <label style={modalEditLabelStyle}>生理期出血天數 (天)</label>
             <input
               type="number"
               value={editBleedingDays}
-              onChange={e => setEditBleedingDays(parseInt(e.target.value, 10) || 6)}
+              onChange={(e) => setEditBleedingDays(parseInt(e.target.value, 10) || 6)}
               min={3}
               max={10}
               style={inputStyle}
@@ -1578,8 +1698,9 @@ const App: React.FC = () => {
   );
 };
 
-// --- Subcomponents ---
-
+/** =========================
+ * 9. Subcomponents
+ * ========================= */
 const RecordDropdown: React.FC<{
   label: string;
   options: string[];
@@ -1588,14 +1709,10 @@ const RecordDropdown: React.FC<{
   accentColor: string;
 }> = ({ label, options, value, onChange, accentColor }) => (
   <div style={{ marginBottom: '15px' }}>
-    <label style={{ fontSize: '0.95rem', color: COLORS.textDark, fontWeight: 'bold', display:'block', marginBottom:'8px' }}>{label}</label>
+    <label style={{ fontSize: '0.95rem', color: COLORS.textDark, fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>{label}</label>
     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-      {options.map(op => (
-        <button
-          key={op}
-          onClick={() => onChange(value === op ? '' : op)}
-          style={dropdownButtonStyle(value === op, accentColor)}
-        >
+      {options.map((op) => (
+        <button key={op} onClick={() => onChange(value === op ? '' : op)} style={dropdownButtonStyle(value === op, accentColor)}>
           {op}
         </button>
       ))}
