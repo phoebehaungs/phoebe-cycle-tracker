@@ -1151,37 +1151,59 @@ const PhoebeCycleTracker: React.FC = () => {
   const totalDaysForChart = 34;
   const xForDay = (day: number, width: number) => ((day - 1) / (totalDaysForChart - 1)) * width;
 
-  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {
-    const points: string[] = [];
-    for (let day = 1; day <= totalDaysForChart; day++) {
-      let intensity = 50;
+const getCurvePoints = (
+  width: number,
+  height: number,
+  type: 'appetite' | 'hormone' | 'edema'
+) => {
+  const points: string[] = [];
 
-      if (type === 'appetite') {
-        if (day <= 6) intensity = 62;
-        else if (day <= 24) intensity = 92;
-        else if (day <= 27) intensity = 52;
-        else if (day <= 29) intensity = 42;
-        else intensity = 12;
-      } else if (type === 'hormone') {
-        if (day <= 14) intensity = 80;
-        else if (day <= 24) intensity = 40;
-        else if (day <= 28) intensity = 20;
-        else intensity = 85;
-      } else if (type === 'edema') {
-        if (day <= 3) intensity = 38;
-        else if (day <= 6) intensity = 68;
-        else if (day <= 24) intensity = 93;
-        else if (day <= 27) intensity = 58;
-        else if (day <= 29) intensity = 38;
-        else intensity = 8;
-      }
+  for (let day = 1; day <= totalDaysForChart; day++) {
+    let intensity = 50;
 
-      const x = xForDay(day, width);
-      const y = height - (intensity / 100) * height;
-      points.push(`${x},${y}`);
+    // 🍽 食慾：穩定期真的要「低」
+    if (type === 'appetite') {
+      if (day <= 3) intensity = 55;          // 生理期初
+      else if (day <= 6) intensity = 50;     // 生理期後段
+      else if (day <= 14) intensity = 35;    // 濾泡期最低
+      else if (day <= 20) intensity = 40;    // 穩定
+      else if (day <= 24) intensity = 45;    // 微升
+      else if (day <= 27) intensity = 55;    // 排卵後
+      else if (day <= 29) intensity = 65;    // 黃體前段
+      else intensity = 85;                   // PMS 高峰
     }
-    return points.join(' ');
-  };
+
+    // 💜 壓力（原本 hormone）：中段回落、後段再升
+    else if (type === 'hormone') {
+      if (day <= 6) intensity = 55;
+      else if (day <= 14) intensity = 45;
+      else if (day <= 20) intensity = 40;
+      else if (day <= 24) intensity = 45;
+      else if (day <= 27) intensity = 55;
+      else if (day <= 29) intensity = 65;
+      else intensity = 80;
+    }
+
+    // 💧 水腫：慢慢堆積，不是整段爆
+    else if (type === 'edema') {
+      if (day <= 3) intensity = 30;
+      else if (day <= 6) intensity = 40;
+      else if (day <= 14) intensity = 25;    // 最輕盈
+      else if (day <= 20) intensity = 35;
+      else if (day <= 24) intensity = 45;
+      else if (day <= 27) intensity = 55;
+      else if (day <= 29) intensity = 65;
+      else intensity = 85;
+    }
+
+    const x = xForDay(day, width);
+    const y = height - (intensity / 100) * height;
+
+    // 🛡 防止 NaN 導致整條線不畫
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+    points.push(`${x},${y}`);
+
 
   const edemaRiseDay = 25;
   const stressRiseDay = 28;
