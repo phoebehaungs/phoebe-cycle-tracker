@@ -713,13 +713,26 @@ const App: React.FC = () => {
   };
 
   useEffect(() => { if (editMode) { setEditDate(lastStartDate); setEditBleedingDays(currentPeriodLength); } }, [editMode, lastStartDate, currentPeriodLength]);
+// Chart Logic
+// 小工具：平滑上升（0~1）
+const smoothstep = (edge0, edge1, x) => {
+  const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
 
-  // Chart Logic
-  // 小工具：平滑上升（0~1）
-  const smoothstep = (edge0, edge1, x) => {
-    const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
-    return t * t * (3 - 2 * t);
-  };
+// ✅ 防止 edge0 === edge1 造成除以 0（會變 Infinity/NaN，圖形就怪）
+const safeSmoothstep = (edge0, edge1, x) => {
+  if (edge0 === edge1) return x >= edge1 ? 1 : 0;
+  return smoothstep(edge0, edge1, x);
+};
+
+// ✅ 做「凸起」：上升後再下降（排卵期用）
+const bump = (start, end, x) => {
+  const up = safeSmoothstep(start, end, x);
+  const down = 1 - safeSmoothstep(end, end + 2, x); // +2：讓它有緩衝回落
+  return up * down;
+};
+
 
   const totalDaysForChart = clamp(averageCycleLength, 21, 60);
   const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
@@ -752,30 +765,50 @@ const App: React.FC = () => {
     for (let day = 1; day <= dayMax; day++) {
       let intensity = 40; 
   
-      if (type === "appetite") {
-        const base = 38;
-        const ovBump = 6 * smoothstep(ovulationStartDay, ovulationEndDay, day); 
-        const lutealRise = 22 * smoothstep(lutealStartDay, pmsStartDay, day);   
-        const pmsBoost = day >= pmsStartDay ? 18 : 0;                           
-        intensity = base + ovBump + lutealRise + pmsBoost; 
-      }
+if (type === "appetite") {
+  const base = 38;
+
+  // ✅ 排卵：凸起一下，過了會回落
+  const ovBump = 6 * bump(ovulationStartDay, ovulationEndDay, day);
+
+  // ✅ 黃體：平滑上升到 PMS 前
+  const lutealRise = 22 * safeSmoothstep(lutealStartDay, pmsStartDay, day);
+
+  // ✅ PMS：不要「瞬間跳高」，改成平滑爬升
+  const pmsBoost = 18 * safeSmoothstep(pmsStartDay, totalDaysForChart, day);
+
+  intensity = base + ovBump + lutealRise + pmsBoost;
+}
+
   
-      if (type === "stress") {
-        const base = 34;
-        const lutealRise = 28 * smoothstep(lutealStartDay, pmsStartDay, day);
-        const pmsBoost = day >= pmsStartDay ? 16 : 0;
-        intensity = base + lutealRise + pmsBoost; 
-      }
+if (type === "stress") {
+  const base = 34;
+
+  // 壓力通常排卵不一定要凸起；你想要也可以加一點點 bump
+  const ovBump = 2 * bump(ovulationStartDay, ovulationEndDay, day);
+
+  const lutealRise = 28 * safeSmoothstep(lutealStartDay, pmsStartDay, day);
+  const pmsBoost = 16 * safeSmoothstep(pmsStartDay, totalDaysForChart, day);
+
+  intensity = base + ovBump + lutealRise + pmsBoost;
+}
+
   
-      if (type === "edema") {
-        const base = 28;
-        const ovBump = 10 * smoothstep(ovulationStartDay, ovulationEndDay, day);
-        const lutealRise = 26 * smoothstep(lutealStartDay + 1, pmsStartDay, day); 
-        const pmsBoost = day >= pmsStartDay ? 18 : 0;
-        intensity = base + ovBump + lutealRise + pmsBoost; 
-      }
-  
-      intensity = clamp(intensity, 5, 95);
+if (type === "edema") {
+  const base = 28;
+
+  // ✅ 水腫：排卵凸起更明顯
+  const ovBump = 10 * bump(ovulationStartDay, ovulationEndDay, day);
+
+  // ✅ 黃體水腫上升：你原本是 lutealStartDay+1，保留也可以
+  const lutealRise = 26 * safeSmoothstep(lutealStartDay + 1, pmsStartDay, day);
+
+  // ✅ PMS 不要跳高
+  const pmsBoost = 18 * safeSmoothstep(pmsStartDay, totalDaysForChart, day);
+
+  intensity = base + ovBump + lutealRise + pmsBoost;
+}
+
   
       const x = xForDay(day, width);
       const y = height - (intensity / 100) * height;
