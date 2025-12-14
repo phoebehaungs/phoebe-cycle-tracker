@@ -44,6 +44,22 @@ interface DateDetail {
   record: SymptomRecord | undefined;
 }
 
+type PhaseKey = 'period' | 'follicular' | 'ovulation' | 'luteal' | 'pms';
+
+interface PhaseSupport {
+  key: PhaseKey;
+  explanation: string;   // 今天的合理解釋
+  todayFocus: string;    // 今天只要做這件事
+  permission: string;    // 我允許自己
+  successRule: string;   // 今日成功標準（兩套成功標準核心）
+}
+
+interface MentalRecord {
+  date: string;          // YYYY-MM-DD
+  anxiety: number;       // 0–10 不安指數
+  win: string;           // 我做得好的事（超短一句）
+}
+
 // --- 2. Initial Data & Rules ---
 
 const INITIAL_HISTORY: CycleRecord[] = [
@@ -53,6 +69,7 @@ const INITIAL_HISTORY: CycleRecord[] = [
 
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
+const MENTAL_STORAGE_KEY = 'phoebeMentalRecords';
 
 const PHASE_RULES: PhaseDefinition[] = [
   {
@@ -128,6 +145,53 @@ const SYMPTOM_OPTIONS: Record<'appetite' | 'mood' | 'body' | 'sleep', string[]> 
   body: ['無水腫', '微水腫', '水腫明顯'],
   sleep: ['良好', '普通', '睡不好'],
 };
+const PHASE_SUPPORT: Record<PhaseKey, PhaseSupport> = {
+  period: {
+    key: 'period',
+    explanation: '今天比較累或想休息，是荷爾蒙低點的正常反應，不代表妳變弱。',
+    todayFocus: '把目標縮小：吃好一餐、睡早一點，其他先放下。',
+    permission: '我允許自己慢下來。',
+    successRule: '今天只要照顧好自己，就是成功。'
+  },
+  follicular: {
+    key: 'follicular',
+    explanation: '今天比較有掌控感，是雌激素上升帶來的自然狀態。',
+    todayFocus: '只做一個小習慣：例如 10 分鐘伸展或備一份安全點心。',
+    permission: '我不用一次做到全部。',
+    successRule: '願意開始、願意維持，就算成功。'
+  },
+  ovulation: {
+    key: 'ovulation',
+    explanation: '今天的波動（悶、腫、敏感）更像荷爾蒙轉換期的反應。',
+    todayFocus: '多喝水 + 不做體重評分，把注意力放回身體感受。',
+    permission: '我允許身體有變化。',
+    successRule: '沒有對自己生氣，就是成功。'
+  },
+  luteal: {
+    key: 'luteal',
+    explanation: '今天更敏感、較疲倦，不是意志力問題，是黃體素影響。',
+    todayFocus: '提前準備安全感：把點心、熱茶、熱敷先放到位。',
+    permission: '我不用撐住一切。',
+    successRule: '穩住節奏、沒有用責備逼自己，就是成功。'
+  },
+  pms: {
+    key: 'pms',
+    explanation: '今天的不安會被放大，是荷爾蒙造成的放大鏡，不代表妳失控。',
+    todayFocus: '先穩住情緒再談飲食：喝水/熱敷/洗澡，先做一件事。',
+    permission: '我允許今天只求不崩潰。',
+    successRule: '沒有失控，就是極大的成功。'
+  }
+};
+
+// 你的 PhaseDefinition.name -> PhaseKey 對應
+const phaseNameToKey = (name: string): PhaseKey => {
+  if (name.includes('生理期')) return 'period';
+  if (name.includes('濾泡期')) return 'follicular';
+  if (name.includes('排卵期')) return 'ovulation';
+  if (name.includes('黃體期')) return 'luteal';
+  return 'pms'; // PMS 高峰 或其他落在最後段
+};
+
 
 // --- 3. Helpers ---
 
@@ -255,6 +319,40 @@ const PhoebeCycleTracker: React.FC = () => {
     return Array.isArray(parsed) ? parsed.filter(x => x && isValidYMD(x.date)) : [];
   });
 
+const [mentalRecords, setMentalRecords] = useState<MentalRecord[]>(() => {
+  const stored = localStorage.getItem(MENTAL_STORAGE_KEY);
+  const parsed = safeJsonParse<MentalRecord[]>(stored, []);
+  return Array.isArray(parsed)
+    ? parsed.filter(x => x && isValidYMD(x.date) && typeof x.anxiety === 'number')
+    : [];
+});
+
+useEffect(() => {
+  localStorage.setItem(MENTAL_STORAGE_KEY, JSON.stringify(mentalRecords));
+}, [mentalRecords]);
+
+const getMentalForDate = useCallback(
+  (dateStr: string): MentalRecord => {
+    const found = mentalRecords.find(r => r.date === dateStr);
+    return found ?? { date: dateStr, anxiety: 0, win: '' };
+  },
+  [mentalRecords]
+);
+
+const upsertMentalForDate = useCallback(
+  (next: MentalRecord) => {
+    setMentalRecords(prev => {
+      const idx = prev.findIndex(r => r.date === next.date);
+      const copy = [...prev];
+      if (idx >= 0) copy[idx] = next;
+      else copy.push(next);
+      return copy;
+    });
+  },
+  []
+);
+
+  
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(history));
   }, [history]);
@@ -302,6 +400,12 @@ const PhoebeCycleTracker: React.FC = () => {
     return daysPassed > last.endDay ? last : found ?? last;
   }, [daysPassed, currentRules]);
 
+      const phaseKey = useMemo(() => phaseNameToKey(currentPhase.name), [currentPhase.name]);
+      const support = useMemo(() => PHASE_SUPPORT[phaseKey], [phaseKey]);
+      const todayMental = useMemo(() => getMentalForDate(todayStr), [getMentalForDate, todayStr]);
+      const showStabilize = todayMental.anxiety >= 7;
+
+      
   const nextPeriodDate = useMemo(() => addDays(lastStartDate, averageCycleLength), [lastStartDate, averageCycleLength]);
   const nextPMSDate = useMemo(() => addDays(nextPeriodDate, -7), [nextPeriodDate]);
 
@@ -561,7 +665,71 @@ const PhoebeCycleTracker: React.FC = () => {
             修改本週期
           </button>
         </div>
+{/* 💛 情緒支援卡 */}
+<div style={{ ...cardStyle, marginTop: '20px', borderLeft: `6px solid ${currentPhase.color}` }}>
+  <h3 style={{ ...cardTitleStyle, borderBottom: 'none', marginBottom: 8 }}>
+    🧠 今天的合理解釋
+  </h3>
 
+  <div style={{ background: currentPhase.lightColor, padding: 12, borderRadius: 12, lineHeight: 1.6 }}>
+    <div style={{ fontWeight: 'bold', color: currentPhase.accent, marginBottom: 6 }}>
+      {currentPhase.name} 的你
+    </div>
+    <div>• {support.explanation}</div>
+    <div style={{ marginTop: 8 }}>✅ 今天只要做一件事：{support.todayFocus}</div>
+    <div style={{ marginTop: 8 }}>🫶 我允許自己：{support.permission}</div>
+  </div>
+
+  {/* 不安指數 */}
+  <div style={{ marginTop: 14 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ fontWeight: 'bold', color: '#555' }}>不安指數（0–10）</div>
+      <div style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 'bold' }}>{todayMental.anxiety}</div>
+    </div>
+
+    <input
+      type="range"
+      min={0}
+      max={10}
+      value={todayMental.anxiety}
+      onChange={e =>
+        upsertMentalForDate({ ...todayMental, anxiety: Number(e.target.value) })
+      }
+      style={{ width: '100%', marginTop: 8 }}
+    />
+
+    {showStabilize && (
+      <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: `2px solid ${currentPhase.accent}` }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 8 }}>🫂 穩住我（現在先不用解決全部）</div>
+        <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
+          <li>我現在的狀態是：{support.explanation}</li>
+          <li>我現在只要做一件事：{support.todayFocus}</li>
+          <li>我對自己說：{support.permission}</li>
+        </ol>
+      </div>
+    )}
+  </div>
+
+  {/* 兩套成功標準 + 我做得好的事 */}
+  <div style={{ marginTop: 14 }}>
+    <div style={{ fontWeight: 'bold', color: '#555', marginBottom: 6 }}>🌱 今天的成功標準</div>
+    <div style={{ background: '#f9f9f9', padding: 10, borderRadius: 10 }}>{support.successRule}</div>
+
+    <div style={{ marginTop: 10 }}>
+      <label style={{ display: 'block', fontSize: '0.9rem', color: '#555', marginBottom: 6 }}>
+        ✍️ 我做得好的事（寫一句就好）
+      </label>
+      <input
+        value={todayMental.win}
+        onChange={e => upsertMentalForDate({ ...todayMental, win: e.target.value })}
+        placeholder="例如：我有吃正餐 / 我沒有暴食 / 我有停下來呼吸"
+        style={inputStyle}
+      />
+    </div>
+  </div>
+</div>
+
+        
         <div style={circularChartContainerStyle}>
           <div style={{ ...circularChartStyle, background: `conic-gradient(${currentPhase.color} ${progressPercent}%, #f9f9f9 ${progressPercent}%)` }}>
             <div style={circularChartInnerStyle}>
