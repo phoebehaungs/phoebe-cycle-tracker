@@ -16,10 +16,10 @@ interface PhaseDefinition {
   diet: string[];
   care: string[];
   tips: string;
-  color: string;
-  lightColor: string;
+  color: string;      // 用於文字、圖標、深色背景
+  lightColor: string; // 用於淺色背景區塊
   hormone: string;
-  accent: string;
+  accent: string;     // 用於強調、按鈕
 }
 
 interface CycleRecord {
@@ -70,6 +70,24 @@ const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
 const MENTAL_STORAGE_KEY = 'phoebeMentalRecords';
 
+// 全新配色方案
+const COLORS = {
+  primary: '#7F8CE0',   // 主藍紫色
+  primaryLight: '#E8EAF6',
+  accent: '#FFAD8F',    // 蜜桃珊瑚色 (強調用)
+  accentDark: '#E69A7E',
+  textDark: '#333344',
+  textGrey: '#7A7A9D',
+  bgApp: '#F4F5FA',     // 極淺藍灰背景
+  bgCard: '#FFFFFF',
+  border: '#EBEBF4',
+  
+  // Chart Colors
+  chartOrange: '#FFAD8F', // 食慾 (蜜桃)
+  chartPurple: '#7F8CE0', // 壓力 (藍紫)
+  chartBlue: '#7FCCC3',   // 水腫 (青綠)
+};
+
 const PHASE_RULES: PhaseDefinition[] = [
   {
     name: '生理期',
@@ -79,10 +97,10 @@ const PHASE_RULES: PhaseDefinition[] = [
     diet: ['食慾偏低/正常', '想吃冰(荷爾蒙反應)'],
     care: ['不逼自己運動', '多喝暖身飲', '早餐多一點蛋白質'],
     tips: '這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。',
-    color: '#FF8FAB',
-    lightColor: '#FFF0F5',
+    color: '#B5A0D9',      // 柔和紫丁香
+    lightColor: '#F2EFF9',
     hormone: '雌激素與黃體素低點',
-    accent: '#FB6F92',
+    accent: '#B5A0D9',
   },
   {
     name: '濾泡期 (黃金期)',
@@ -92,10 +110,10 @@ const PHASE_RULES: PhaseDefinition[] = [
     diet: ['食慾最低', '最好控制', '飽足感良好'],
     care: ['適合減脂/建立習慣', 'Zumba/伸展效果好'],
     tips: '現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！',
-    color: '#88D8B0',
-    lightColor: '#F0FFF4',
+    color: '#7FCCC3',      // 清新薄荷綠
+    lightColor: '#EDF7F6',
     hormone: '雌激素逐漸上升',
-    accent: '#48BB78',
+    accent: '#7FCCC3',
   },
   {
     name: '排卵期',
@@ -105,10 +123,10 @@ const PHASE_RULES: PhaseDefinition[] = [
     diet: ['食慾微增', '有些人想吃甜'],
     care: ['多喝水、多吃蔬菜', '補充可溶性纖維'],
     tips: '這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。',
-    color: '#FFD166',
+    color: '#F6D776',      // 溫暖日光黃
     lightColor: '#FFFBEB',
     hormone: '黃體生成素(LH)高峰',
-    accent: '#F6AD55',
+    accent: '#E0C25E',
   },
   {
     name: '黃體期前段',
@@ -118,10 +136,10 @@ const PHASE_RULES: PhaseDefinition[] = [
     diet: ['開始嘴饞', '想吃頻率變高'],
     care: ['早餐加蛋白質', '下午備好安全點心'],
     tips: '提前兩天準備，比發生後補救更有效。',
-    color: '#A5A6F6',
-    lightColor: '#F3F4FF',
+    color: '#7F8CE0',      // 主藍紫色
+    lightColor: '#E8EAF6',
     hormone: '黃體素開始上升',
-    accent: '#7F9CF5',
+    accent: '#7F8CE0',
   },
   {
     name: 'PMS 高峰',
@@ -131,10 +149,10 @@ const PHASE_RULES: PhaseDefinition[] = [
     diet: ['想吃甜、想吃冰', '正餐後仍想吃'],
     care: ['補充鎂(減少焦慮)', '允許多吃 5～10%', '熱茶/小毯子/深呼吸'],
     tips: '這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。',
-    color: '#EF476F',
-    lightColor: '#FFE5EC',
+    color: '#E07F8C',      // 柔和玫瑰紅
+    lightColor: '#FFF0F3',
     hormone: '黃體素高峰 / 準備下降',
-    accent: '#D6336C',
+    accent: '#E07F8C',
   },
 ];
 
@@ -289,7 +307,7 @@ const PhoebeCycleTracker: React.FC = () => {
   useEffect(() => {
     const link = document.createElement('link');
     link.href =
-      'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@600;700&display=swap';
+      'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@600;700;800&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
     return () => {
@@ -619,7 +637,8 @@ const PhoebeCycleTracker: React.FC = () => {
       <header style={headerStyle}>
         <div style={{ width: '20px' }} />
         <div style={headerContentStyle}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="#FB6F92" xmlns="http://www.w3.org/2000/svg">
+          {/* Logo Icon - 使用主色調 */}
+          <svg width="28" height="28" viewBox="0 0 24 24" fill={COLORS.primary} xmlns="http://www.w3.org/2000/svg">
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
           <h1 style={headerTitleStyle}>PMS大作戰</h1>
@@ -629,16 +648,18 @@ const PhoebeCycleTracker: React.FC = () => {
 
       <div style={dashboardCardStyle}>
         <div style={todayStatusContainerStyle}>
-          <span style={todayDateStyle}>
-            {parseLocalDate(todayStr).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })}日
-          </span>
-          <span style={todayLabelStyle}>今天</span>
+          <div>
+             <span style={todayLabelStyle}>{parseLocalDate(todayStr).toLocaleDateString('zh-TW', { month: 'long' })}</span>
+             <div style={todayDateStyle}>
+              {parseLocalDate(todayStr).getDate()}日
+            </div>
+          </div>
           <button
             onClick={() => {
               setEditDate(lastStartDate);
               setEditMode(true);
             }}
-            style={editCycleButtonStyle(currentPhase.accent)}
+            style={editCycleButtonStyle}
           >
             修改本週期
           </button>
@@ -647,41 +668,42 @@ const PhoebeCycleTracker: React.FC = () => {
         <div style={circularChartContainerStyle}>
           <div style={circularChartStyle(currentPhase.color, progressPercent)}>
             <div style={circularChartInnerStyle}>
-              <div style={{ fontSize: '0.9rem', color: '#888' }}>Cycle Day</div>
+              <div style={{ fontSize: '0.9rem', color: COLORS.textGrey, fontWeight:'bold' }}>Cycle Day</div>
               <div style={circularChartDayStyle}>{daysPassed}</div>
             </div>
           </div>
           <div style={statusTextStyle}>
-            <div style={{ color: currentPhase.accent, fontWeight: 'bold', fontSize: '1.4rem' }}>{currentPhase.name}</div>
-            <div style={{ color: '#888', fontSize: '0.9rem', marginTop: '4px' }}>{currentPhase.hormone}</div>
-            <div style={phaseTipsStyle(currentPhase.lightColor, currentPhase.color)}>
-              💡 {currentPhase.tips}
-            </div>
+            <div style={{ color: currentPhase.color, fontWeight: '800', fontSize: '1.5rem' }}>{currentPhase.name}</div>
+            <div style={{ color: COLORS.textGrey, fontSize: '0.95rem', marginTop: '4px', fontWeight: '500' }}>{currentPhase.hormone}</div>
           </div>
         </div>
+        
+        <div style={phaseTipsStyle(currentPhase.lightColor, currentPhase.color)}>
+              💡 <b>貼心提醒：</b>{currentPhase.tips}
+        </div>
 
-        <div style={cardStyle(currentPhase.lightColor, currentPhase.color)}>
-          <h3 style={cardTitleStyle(currentPhase.accent, false)}>💖 今天的貼心提醒</h3>
+        <div style={cardStyle(COLORS.border, 'transparent')}>
+          <h3 style={cardTitleStyle(COLORS.accent, false)}>💖 今天的照顧方式</h3>
           <ul style={careListStyle}>{currentPhase.care.map((c, i) => <li key={i}>{c}</li>)}</ul>
         </div>
       </div>
 
       <div style={mentalSupportCardStyle(currentPhase.color)}>
-        <h3 style={cardTitleStyle(currentPhase.color, true)}>🧠 今天的精神穩定站</h3>
+        <h3 style={cardTitleStyle(COLORS.textDark, false)}>🧠 今天的精神穩定站</h3>
 
-        <div style={mentalTipBlockStyle(currentPhase.lightColor, currentPhase.accent)}>
-          <div style={{ fontWeight: 'bold', color: currentPhase.accent, marginBottom: 6 }}>
+        <div style={mentalTipBlockStyle(currentPhase.lightColor, currentPhase.color)}>
+          <div style={{ fontWeight: 'bold', color: currentPhase.color, marginBottom: 8, fontSize:'1.1rem' }}>
             {currentPhase.name} 的你
           </div>
-          <div>• {support.explanation}</div>
-          <div style={{ marginTop: 8 }}>✅ 今天只要做一件事：{support.todayFocus}</div>
-          <div style={{ marginTop: 8 }}>🫶 我允許自己：{support.permission}</div>
+          <div style={{marginBottom: '8px'}}>• {support.explanation}</div>
+          <div style={{ marginTop: 12 }}>✅ <b>今天只要做一件事：</b>{support.todayFocus}</div>
+          <div style={{ marginTop: 8 }}>🫶 <b>我允許自己：</b>{support.permission}</div>
         </div>
 
-        <div style={{ marginTop: 18, padding: '0 5px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontWeight: 'bold', color: '#555' }}>不安指數（0–10）</div>
-            <div style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 'bold', fontSize: '1.2rem', color: todayMental.anxiety >= 7 ? '#D6336C' : currentPhase.accent }}>{todayMental.anxiety}</div>
+        <div style={{ marginTop: 20, padding: '0 5px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom:'5px' }}>
+            <div style={{ fontWeight: 'bold', color: COLORS.textDark }}>不安指數 (0-10)</div>
+            <div style={{ fontFamily: 'Nunito, sans-serif', fontWeight: '800', fontSize: '1.4rem', color: todayMental.anxiety >= 7 ? COLORS.accent : COLORS.primary }}>{todayMental.anxiety}</div>
           </div>
 
           <input
@@ -696,9 +718,11 @@ const PhoebeCycleTracker: React.FC = () => {
           />
 
           {showStabilize && (
-            <div style={stabilizeBlockStyle(currentPhase.accent)}>
-              <div style={{ fontWeight: 'bold', marginBottom: 8, color: '#D6336C' }}>🚨 穩住我（現在先不用解決全部）</div>
-              <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6, fontSize: '0.9rem' }}>
+            <div style={stabilizeBlockStyle(COLORS.accent)}>
+              <div style={{ fontWeight: 'bold', marginBottom: 8, color: COLORS.accentDark, display:'flex', alignItems:'center' }}>
+                 <span style={{fontSize:'1.2rem', marginRight:'5px'}}>🚨</span> 穩住我（現在先不用解決全部）
+              </div>
+              <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, fontSize: '0.95rem', color: COLORS.textDark }}>
                 <li>我現在的狀態是：{support.explanation}</li>
                 <li>我現在只要做一件事：{support.todayFocus}</li>
                 <li>我對自己說：{support.permission}</li>
@@ -707,11 +731,11 @@ const PhoebeCycleTracker: React.FC = () => {
           )}
         </div>
 
-        <div style={{ marginTop: 18, padding: '0 5px' }}>
-          <div style={{ fontWeight: 'bold', color: '#555', marginBottom: 6 }}>🌱 今天的成功標準</div>
+        <div style={{ marginTop: 25 }}>
+          <div style={{ fontWeight: 'bold', color: COLORS.textDark, marginBottom: 10 }}>🌱 今天的成功標準</div>
           <div style={successRuleBlockStyle}>{support.successRule}</div>
 
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 20 }}>
             <label style={winLabelStyle}>
               ✍️ 我做得好的事（寫一句就好）
             </label>
@@ -727,29 +751,33 @@ const PhoebeCycleTracker: React.FC = () => {
 
       <div style={chartCardStyle}>
         <div style={chartHeaderStyle}>
-          <h3 style={cardTitleStyle('#444', false)}>📉 週期趨勢分析</h3>
+          <h3 style={cardTitleStyle(COLORS.textDark, false)}>📉 週期趨勢分析</h3>
           <div style={chartLegendStyle}>
-            <span style={{ color: '#F49B00' }}>● 食慾</span>
-            <span style={{ color: '#896CD9' }}>● 壓力</span>
-            <span style={{ color: '#29B6F6' }}>● 水腫</span>
+            <span style={{ color: COLORS.chartOrange, fontWeight:'bold' }}>● 食慾</span>
+            <span style={{ color: COLORS.chartPurple, fontWeight:'bold' }}>● 壓力</span>
+            <span style={{ color: COLORS.chartBlue, fontWeight:'bold' }}>● 水腫</span>
           </div>
         </div>
 
-        <div style={{ position: 'relative', height: '140px' }}>
-          <svg viewBox="0 0 340 140" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
-            <line x1="0" y1="35" x2="340" y2="35" stroke="#f0f0f0" strokeWidth="1" />
-            <line x1="0" y1="70" x2="340" y2="70" stroke="#f0f0f0" strokeWidth="1" />
-            <line x1="0" y1="105" x2="340" y2="105" stroke="#f0f0f0" strokeWidth="1" />
+        <div style={{ position: 'relative', height: '150px', marginTop:'10px' }}>
+          <svg viewBox="0 0 340 150" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
+            {/* Grid Lines */}
+            <line x1="0" y1="37.5" x2="340" y2="37.5" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
+            <line x1="0" y1="75" x2="340" y2="75" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
+            <line x1="0" y1="112.5" x2="340" y2="112.5" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
 
-            <polyline points={getCurvePoints(340, 140, 'appetite')} fill="none" stroke="#F49B00" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            <polyline points={getCurvePoints(340, 140, 'hormone')} fill="none" stroke="#896CD9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
-            <polyline points={getCurvePoints(340, 140, 'edema')} fill="none" stroke="#29B6F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            {/* Data Lines */}
+            <polyline points={getCurvePoints(340, 150, 'appetite')} fill="none" stroke={COLORS.chartOrange} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points={getCurvePoints(340, 150, 'hormone')} fill="none" stroke={COLORS.chartPurple} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
+            <polyline points={getCurvePoints(340, 150, 'edema')} fill="none" stroke={COLORS.chartBlue} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
-            <line x1={xForDay(chartDaysPassed, 340)} y1="0" x2={xForDay(chartDaysPassed, 340)} y2="140" stroke="#333" strokeWidth="1.5" strokeDasharray="4,2" />
+            {/* Today Marker */}
+            <line x1={xForDay(chartDaysPassed, 340)} y1="0" x2={xForDay(chartDaysPassed, 340)} y2="150" stroke={COLORS.textDark} strokeWidth="2" strokeDasharray="4,2" />
 
-            <line x1={xForDay(edemaRiseDay, 340)} y1="0" x2={xForDay(edemaRiseDay, 340)} y2="140" stroke="#29B6F6" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
-            <line x1={xForDay(stressRiseDay, 340)} y1="0" x2={xForDay(stressRiseDay, 340)} y2="140" stroke="#896CD9" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
-            <line x1={xForDay(pmsPeakDay, 340)} y1="0" x2={xForDay(pmsPeakDay, 340)} y2="140" stroke="#D6336C" strokeWidth="1" strokeDasharray="2,2" opacity="0.4" />
+            {/* Critical Events */}
+            <line x1={xForDay(edemaRiseDay, 340)} y1="0" x2={xForDay(edemaRiseDay, 340)} y2="150" stroke={COLORS.chartBlue} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.5" />
+            <line x1={xForDay(stressRiseDay, 340)} y1="0" x2={xForDay(stressRiseDay, 340)} y2="150" stroke={COLORS.chartPurple} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.5" />
+            <line x1={xForDay(pmsPeakDay, 340)} y1="0" x2={xForDay(pmsPeakDay, 340)} y2="150" stroke={COLORS.accent} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.8" />
           </svg>
 
           <div style={todayMarkerStyle(xForDay(chartDaysPassed, 340))}>今天</div>
@@ -765,32 +793,34 @@ const PhoebeCycleTracker: React.FC = () => {
         <div style={keyDatesCardStyle}>
           <h4 style={keyDatesTitleStyle}>📅 關鍵預測日期</h4>
           <div style={keyDateItemStyle}>
-            <span style={keyDateLabelStyle('#29B6F6')}>💧 水腫與食慾明顯上升</span>
-            <span style={keyDateValueStyle()}>{edemaRiseDateStr} (Day 25)</span>
+            <span style={keyDateLabelStyle(COLORS.chartBlue, COLORS.primaryLight)}>💧 水腫與食慾明顯上升</span>
+            <span style={keyDateValueStyle}>{edemaRiseDateStr} (Day 25)</span>
           </div>
           <div style={keyDateItemStyle}>
-            <span style={keyDateLabelStyle('#896CD9')}>💜 壓力開始明顯上升</span>
-            <span style={keyDateValueStyle()}>{stressRiseDateStr} (Day 28)</span>
+            <span style={keyDateLabelStyle(COLORS.chartPurple, COLORS.primaryLight)}>💜 壓力開始明顯上升</span>
+            <span style={keyDateValueStyle}>{stressRiseDateStr} (Day 28)</span>
           </div>
           <div style={keyDateItemStyle}>
-            <span style={keyDateLabelStyle('#D6336C', '#FFE5EC')}>🔥 PMS 全面高峰</span>
-            <span style={keyDateValueStyle('#D6336C')}>{pmsPeakDateStr} (Day 30)</span>
+            <span style={keyDateLabelStyle(COLORS.accentDark, '#FFF0ED')}>🔥 PMS 全面高峰</span>
+            <span style={keyDateValueStyle(COLORS.accentDark)}>{pmsPeakDateStr} (Day 30)</span>
           </div>
         </div>
       </div>
 
       <div style={calendarCardStyle}>
-        <h3 style={cardTitleStyle('#444', false)}>🗓️ 週期月曆</h3>
-        <div style={calendarNavStyle}>
-          <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} style={navButtonStyle}>
-            &lt;
-          </button>
-          <span style={monthTitleStyle}>
-            {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
-          </span>
-          <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} style={navButtonStyle}>
-            &gt;
-          </button>
+        <div style={calendarHeaderStyle}>
+            <h3 style={cardTitleStyle(COLORS.textDark, false, true)}>🗓️ 週期月曆</h3>
+            <div style={calendarNavStyle}>
+            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} style={navButtonStyle}>
+                &lt;
+            </button>
+            <span style={monthTitleStyle}>
+                {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
+            </span>
+            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} style={navButtonStyle}>
+                &gt;
+            </button>
+            </div>
         </div>
 
         <div style={calendarGridStyle}>
@@ -825,20 +855,20 @@ const PhoebeCycleTracker: React.FC = () => {
       </div>
 
       <div style={gridContainerStyle}>
-        <div style={predictionCardStyle(PHASE_RULES[2].color)}>
-          <h3 style={cardTitleStyle('#444', false)}>🔮 下次預測</h3>
-          <div style={{ marginBottom: '12px' }}>
-            <div style={predictionLabelStyle}>下次 PMS 高峰：</div>
-            <strong style={predictionDateStyle(PHASE_RULES[4].accent)}>{nextPMSDate}</strong>
+        <div style={predictionCardStyle(COLORS.primary)}>
+          <h3 style={cardTitleStyle(COLORS.textDark, false)}>🔮 下次預測</h3>
+          <div style={{ marginBottom: '15px' }}>
+            <div style={predictionLabelStyle}>下次 PMS 高峰</div>
+            <strong style={predictionDateStyle(COLORS.accent)}>{nextPMSDate}</strong>
           </div>
           <div>
-            <div style={predictionLabelStyle}>下次生理期預計：</div>
-            <strong style={predictionDateStyle(PHASE_RULES[0].accent)}>{nextPeriodDate}</strong>
+            <div style={predictionLabelStyle}>下次生理期預計</div>
+            <strong style={predictionDateStyle(COLORS.primary)}>{nextPeriodDate}</strong>
           </div>
         </div>
 
-        <div style={recordInputCardStyle(PHASE_RULES[1].color)}>
-          <h3 style={cardTitleStyle('#444', false)}>這次生理期第一天</h3>
+        <div style={recordInputCardStyle(COLORS.accent)}>
+          <h3 style={cardTitleStyle(COLORS.textDark, false)}>這次生理期第一天</h3>
           <input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} style={inputStyle} />
           <button onClick={handleUpsertPeriodRecord} style={recordButtonStyle}>
             確認日期
@@ -848,7 +878,7 @@ const PhoebeCycleTracker: React.FC = () => {
 
       <div style={{ display: 'grid', gap: '15px', marginTop: '20px' }}>
         <div style={symptomCardStyle}>
-          <h3 style={cardTitleStyle('#444', false)}>🌡️ 身體症狀與食慾預測</h3>
+          <h3 style={cardTitleStyle(COLORS.textDark, false)}>🌡️ 身體症狀與食慾預測</h3>
           <ul style={listListStyle}>
             {[...currentPhase.symptoms, ...currentPhase.diet].map((s, i) => (
               <li key={i}>{s}</li>
@@ -860,34 +890,33 @@ const PhoebeCycleTracker: React.FC = () => {
       {modalDetail && currentRecord && (
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
-            <h3 style={modalTitleStyle(modalDetail.phase.color)}>{modalDetail.date} 詳情</h3>
+            <div style={modalHeaderStyle}>
+                <h3 style={modalTitleStyle(modalDetail.phase.color)}>{modalDetail.date}</h3>
+                <button onClick={() => setModalDetail(null)} style={modalCloseButtonStyle}>×</button>
+            </div>
             <p style={modalPhaseDetailStyle}>
               週期日: <strong style={modalCycleDayStyle}>Day {modalDetail.day}</strong>
-            </p>
-            <p style={modalPhaseDetailStyle}>
+              <span style={{margin:'0 8px', color:COLORS.border}}>|</span>
               階段: <strong style={{ color: modalDetail.phase.color }}>{modalDetail.phase.name}</strong>
             </p>
 
             <div style={modalRecordSectionStyle}>
               <h4 style={modalRecordTitleStyle}>📝 每日紀錄</h4>
 
-              <RecordDropdown label="食慾" options={SYMPTOM_OPTIONS.appetite} value={currentRecord.appetite} onChange={v => setCurrentRecord({ ...currentRecord, appetite: v as Appetite })} />
-              <RecordDropdown label="心情" options={SYMPTOM_OPTIONS.mood} value={currentRecord.mood} onChange={v => setCurrentRecord({ ...currentRecord, mood: v as Mood })} />
-              <RecordDropdown label="水腫" options={SYMPTOM_OPTIONS.body} value={currentRecord.body} onChange={v => setCurrentRecord({ ...currentRecord, body: v as Body })} />
-              <RecordDropdown label="睡眠" options={SYMPTOM_OPTIONS.sleep} value={currentRecord.sleep} onChange={v => setCurrentRecord({ ...currentRecord, sleep: v as Sleep })} />
+              <RecordDropdown label="食慾" options={SYMPTOM_OPTIONS.appetite} value={currentRecord.appetite} onChange={v => setCurrentRecord({ ...currentRecord, appetite: v as Appetite })} accentColor={modalDetail.phase.accent} />
+              <RecordDropdown label="心情" options={SYMPTOM_OPTIONS.mood} value={currentRecord.mood} onChange={v => setCurrentRecord({ ...currentRecord, mood: v as Mood })} accentColor={modalDetail.phase.accent} />
+              <RecordDropdown label="水腫" options={SYMPTOM_OPTIONS.body} value={currentRecord.body} onChange={v => setCurrentRecord({ ...currentRecord, body: v as Body })} accentColor={modalDetail.phase.accent} />
+              <RecordDropdown label="睡眠" options={SYMPTOM_OPTIONS.sleep} value={currentRecord.sleep} onChange={v => setCurrentRecord({ ...currentRecord, sleep: v as Sleep })} accentColor={modalDetail.phase.accent} />
 
-              <div style={{ marginTop: '10px' }}>
+              <div style={{ marginTop: '15px' }}>
                 <label style={modalNoteLabelStyle}>備註：</label>
-                <textarea value={currentRecord.notes} onChange={e => setCurrentRecord({ ...currentRecord, notes: e.target.value })} rows={2} style={inputStyle} />
+                <textarea value={currentRecord.notes} onChange={e => setCurrentRecord({ ...currentRecord, notes: e.target.value })} rows={3} style={textareaStyle} />
               </div>
             </div>
 
             <div style={modalButtonContainerStyle}>
-              <button onClick={() => setModalDetail(null)} style={modalCancelButtonStyle}>
-                取消
-              </button>
               <button onClick={handleSaveSymptomRecord} style={modalSaveButtonStyle(modalDetail.phase.accent)}>
-                儲存
+                儲存紀錄
               </button>
             </div>
           </div>
@@ -897,10 +926,15 @@ const PhoebeCycleTracker: React.FC = () => {
       {editMode && (
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
-            <h3 style={modalTitleStyle(PHASE_RULES[3].accent)}>📅 修改本次週期</h3>
-            <label style={modalEditLabelStyle}>開始日期：</label>
+            <div style={modalHeaderStyle}>
+                <h3 style={modalTitleStyle(COLORS.accent)}>📅 修改本次週期</h3>
+                <button onClick={() => setEditMode(false)} style={modalCloseButtonStyle}>×</button>
+            </div>
+            
+            <label style={modalEditLabelStyle}>開始日期</label>
             <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={inputStyle} />
-            <label style={modalEditLabelStyle}>生理期出血天數：</label>
+            
+            <label style={modalEditLabelStyle}>生理期出血天數 (天)</label>
             <input
               type="number"
               value={editBleedingDays}
@@ -910,11 +944,8 @@ const PhoebeCycleTracker: React.FC = () => {
               style={inputStyle}
             />
             <div style={modalButtonContainerStyle}>
-              <button onClick={() => setEditMode(false)} style={modalCancelButtonStyle}>
-                取消
-              </button>
-              <button onClick={handleSaveEdit} style={modalSaveButtonStyle(PHASE_RULES[3].accent)}>
-                儲存
+              <button onClick={handleSaveEdit} style={modalSaveButtonStyle(COLORS.accent)}>
+                確認修改
               </button>
             </div>
           </div>
@@ -931,15 +962,16 @@ const RecordDropdown: React.FC<{
   options: string[];
   value: string;
   onChange: (v: string) => void;
-}> = ({ label, options, value, onChange }) => (
-  <div style={{ marginBottom: '10px' }}>
-    <label style={{ fontSize: '0.9rem', color: '#666', fontWeight: 'bold' }}>{label}: </label>
-    <div style={{ display: 'flex', gap: '8px', marginTop: '5px', flexWrap: 'wrap' }}>
+  accentColor: string;
+}> = ({ label, options, value, onChange, accentColor }) => (
+  <div style={{ marginBottom: '15px' }}>
+    <label style={{ fontSize: '0.95rem', color: COLORS.textDark, fontWeight: 'bold', display:'block', marginBottom:'8px' }}>{label}</label>
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
       {options.map(op => (
         <button
           key={op}
           onClick={() => onChange(value === op ? '' : op)}
-          style={dropdownButtonStyle(value === op)}
+          style={dropdownButtonStyle(value === op, accentColor)}
         >
           {op}
         </button>
@@ -949,81 +981,84 @@ const RecordDropdown: React.FC<{
 );
 
 // Style Definitions
+
 const appContainerStyle: React.CSSProperties = {
   maxWidth: '600px',
   margin: '0 auto',
   padding: '0 20px 40px',
   fontFamily: 'Noto Sans TC, sans-serif',
-  backgroundColor: '#fbfaf7',
+  backgroundColor: COLORS.bgApp,
   minHeight: '100vh',
   letterSpacing: '0.02em',
+  color: COLORS.textDark,
 };
 
 const headerStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  padding: '15px 0',
-  marginBottom: '10px',
-  backgroundColor: 'white',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+  padding: '18px 0',
+  marginBottom: '15px',
+  backgroundColor: 'rgba(255,255,255,0.95)',
+  boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
   position: 'sticky',
   top: 0,
   zIndex: 10,
+  backdropFilter: 'blur(5px)',
 };
 
-const headerContentStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '8px' };
-const headerTitleStyle: React.CSSProperties = { fontSize: '1.4rem', margin: 0, color: '#333', fontWeight: 'bold' };
+const headerContentStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '10px' };
+const headerTitleStyle: React.CSSProperties = { fontSize: '1.5rem', margin: 0, color: COLORS.textDark, fontWeight: '800', letterSpacing:'0.05em' };
 
 const baseCardStyle: React.CSSProperties = {
-  backgroundColor: 'white',
-  padding: '20px',
-  borderRadius: '16px',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+  backgroundColor: COLORS.bgCard,
+  padding: '25px',
+  borderRadius: '24px',
+  boxShadow: '0 8px 20px rgba(0,0,0,0.04)',
   transition: 'all 0.3s ease',
+  border: `1px solid ${COLORS.border}`,
 };
 
 const dashboardCardStyle: React.CSSProperties = {
   ...baseCardStyle,
-  textAlign: 'center',
-  marginBottom: '20px',
-  padding: '25px 20px',
+  marginBottom: '25px',
+  padding: '30px 25px',
 };
 
-const todayStatusContainerStyle: React.CSSProperties = { display: 'flex', gap: '8px', alignItems: 'baseline', marginBottom: '15px', borderBottom: '1px solid #f0f0f0', paddingBottom: '15px' };
-const todayDateStyle: React.CSSProperties = { fontSize: '1.6rem', fontWeight: 'bold', color: '#333', fontFamily: 'Nunito, sans-serif' };
-const todayLabelStyle: React.CSSProperties = { fontSize: '1.2rem', color: '#666' };
+const todayStatusContainerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '25px' };
+const todayDateStyle: React.CSSProperties = { fontSize: '2.2rem', fontWeight: '800', color: COLORS.textDark, fontFamily: 'Nunito, sans-serif', lineHeight: 1 };
+const todayLabelStyle: React.CSSProperties = { fontSize: '1rem', color: COLORS.textGrey, fontWeight: '500', marginBottom:'5px', display:'block' };
 
-const editCycleButtonStyle = (accent: string): React.CSSProperties => ({
-  background: 'none',
-  border: '1px solid #ddd',
-  color: accent,
+const editCycleButtonStyle: React.CSSProperties = {
+  background: COLORS.accent,
+  border: 'none',
+  color: 'white',
   fontWeight: 'bold',
   cursor: 'pointer',
-  marginLeft: 'auto',
   fontFamily: 'Noto Sans TC, sans-serif',
-  padding: '4px 10px',
-  borderRadius: '12px',
-  fontSize: '0.85rem',
-  transition: 'background-color 0.2s',
-});
+  padding: '10px 16px',
+  borderRadius: '30px',
+  fontSize: '0.9rem',
+  boxShadow: '0 4px 10px rgba(255, 173, 143, 0.3)',
+  transition: 'transform 0.1s',
+};
 
-const circularChartContainerStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', margin: '15px 0' };
+const circularChartContainerStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', margin: '25px 0 30px' };
 const circularChartStyle = (color: string, percent: number): React.CSSProperties => ({
-  width: '120px',
-  height: '120px',
+  width: '130px',
+  height: '130px',
   borderRadius: '50%',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
-  background: `conic-gradient(${color} ${percent}%, #f0f0f0 ${percent}%)`,
+  boxShadow: `0 8px 20px ${color}33`, // 使用階段顏色作為陰影
+  background: `conic-gradient(${color} ${percent}%, ${COLORS.primaryLight} ${percent}%)`,
   flexShrink: 0,
 });
 
 const circularChartInnerStyle: React.CSSProperties = {
-  width: '100px',
-  height: '100px',
+  width: '108px',
+  height: '108px',
   borderRadius: '50%',
   backgroundColor: 'white',
   display: 'flex',
@@ -1032,255 +1067,272 @@ const circularChartInnerStyle: React.CSSProperties = {
   alignItems: 'center',
 };
 
-const circularChartDayStyle: React.CSSProperties = { fontSize: '3.2rem', fontWeight: 'bold', color: '#4a4a4a', lineHeight: 1, fontFamily: 'Nunito, sans-serif' };
+const circularChartDayStyle: React.CSSProperties = { fontSize: '3.5rem', fontWeight: '800', color: COLORS.textDark, lineHeight: 1, fontFamily: 'Nunito, sans-serif' };
 
-const statusTextStyle: React.CSSProperties = { marginLeft: '25px', textAlign: 'left', flex: 1 };
+const statusTextStyle: React.CSSProperties = { marginLeft: '30px', textAlign: 'left', flex: 1 };
 const phaseTipsStyle = (lightColor: string, color: string): React.CSSProperties => ({
-  marginTop: '12px',
-  fontSize: '0.85rem',
-  color: '#555',
+  marginTop: '20px',
+  fontSize: '0.95rem',
+  color: COLORS.textDark,
   backgroundColor: lightColor,
-  padding: '10px',
-  borderRadius: '10px',
-  border: `1px dashed ${color}AA`,
-  lineHeight: '1.4',
+  padding: '15px',
+  borderRadius: '16px',
+  borderLeft: `4px solid ${color}`,
+  lineHeight: '1.6',
 });
 
-const cardStyle = (lightColor: string, color: string): React.CSSProperties => ({
+const cardStyle = (borderColor: string, bgColor: string): React.CSSProperties => ({
   ...baseCardStyle,
-  padding: '15px',
+  padding: '20px',
   marginTop: '20px',
   boxShadow: 'none',
-  border: `2px solid ${lightColor}`,
+  border: `1px solid ${borderColor}`,
+  backgroundColor: bgColor === 'transparent' ? COLORS.bgCard : bgColor,
 });
 
-const cardTitleStyle = (color: string, noBorder: boolean): React.CSSProperties => ({
-  fontSize: '1.1rem',
-  borderBottom: noBorder ? 'none' : '1px solid #eee',
-  paddingBottom: noBorder ? '0' : '8px',
-  marginBottom: noBorder ? '10px' : '15px',
+const cardTitleStyle = (color: string, noBorder: boolean, isFlex: boolean = false): React.CSSProperties => ({
+  fontSize: '1.15rem',
+  borderBottom: noBorder ? 'none' : `1px solid ${COLORS.border}`,
+  paddingBottom: noBorder ? '0' : '12px',
+  marginBottom: noBorder ? '15px' : '20px',
   color: color,
-  fontWeight: 'bold',
+  fontWeight: '800',
+  display: isFlex ? 'flex' : 'block',
+  alignItems: 'center',
+  gap: '8px',
 });
 
 const careListStyle: React.CSSProperties = {
   paddingLeft: '20px',
-  lineHeight: '1.7',
-  color: '#555',
+  lineHeight: '1.8',
+  color: COLORS.textDark,
   margin: 0,
-  fontSize: '0.95rem',
+  fontSize: '1rem',
 };
 
 const mentalSupportCardStyle = (color: string): React.CSSProperties => ({
   ...baseCardStyle,
   marginTop: '20px',
-  borderLeft: `6px solid ${color}`,
-  padding: '20px 25px',
+  borderTop: `5px solid ${color}`, // 改為頂部邊框
 });
 
-const mentalTipBlockStyle = (lightColor: string, accent: string): React.CSSProperties => ({
+const mentalTipBlockStyle = (lightColor: string, color: string): React.CSSProperties => ({
   background: lightColor,
-  padding: 15,
-  borderRadius: 12,
-  lineHeight: 1.6,
-  fontSize: '0.95rem',
-  border: `1px solid ${accent}40`,
+  padding: '20px',
+  borderRadius: '18px',
+  lineHeight: 1.7,
+  fontSize: '1rem',
+  color: COLORS.textDark,
 });
 
 const rangeInputStyle: React.CSSProperties = {
   width: '100%',
-  marginTop: 8,
-  accentColor: '#896CD9',
+  marginTop: 12,
+  height: '6px',
+  borderRadius: '3px',
+  accentColor: COLORS.primary,
 };
 
 const stabilizeBlockStyle = (accent: string): React.CSSProperties => ({
-  marginTop: 15,
-  padding: 15,
-  borderRadius: 12,
+  marginTop: 20,
+  padding: '20px',
+  borderRadius: '18px',
   border: `2px solid ${accent}`,
-  backgroundColor: '#fffcf7',
+  backgroundColor: '#FFF8F6', // 極淺的蜜桃色背景
 });
 
-const successRuleBlockStyle: React.CSSProperties = { background: '#f5f5f5', padding: 12, borderRadius: 10, lineHeight: 1.5, fontSize: '0.95rem' };
-const winLabelStyle: React.CSSProperties = { display: 'block', fontSize: '0.9rem', color: '#555', marginBottom: 6, fontWeight: 'bold' };
+const successRuleBlockStyle: React.CSSProperties = { background: COLORS.primaryLight, padding: '15px', borderRadius: '12px', lineHeight: 1.6, fontSize: '1rem', color: COLORS.textDark, fontWeight:'500' };
+const winLabelStyle: React.CSSProperties = { display: 'block', fontSize: '1rem', color: COLORS.textDark, marginBottom: 8, fontWeight: 'bold' };
 
 const chartCardStyle: React.CSSProperties = {
   ...baseCardStyle,
-  marginTop: '20px',
-  padding: '20px 15px 25px',
+  marginTop: '25px',
+  padding: '25px 20px 30px',
 };
 
-const chartHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', padding: '0 5px' };
-const chartLegendStyle: React.CSSProperties = { fontSize: '0.75rem', color: '#999', display: 'flex', gap: '10px', alignItems: 'center' };
+const chartHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '0 5px' };
+const chartLegendStyle: React.CSSProperties = { fontSize: '0.8rem', color: COLORS.textGrey, display: 'flex', gap: '12px', alignItems: 'center' };
 const todayMarkerStyle = (x: number): React.CSSProperties => ({
   position: 'absolute',
-  left: `calc(${(x / 340) * 100}% - 14px)`,
-  bottom: '-22px',
-  backgroundColor: '#555555',
+  left: `calc(${(x / 340) * 100}% - 18px)`,
+  bottom: '-28px',
+  backgroundColor: COLORS.textDark,
   color: 'white',
-  fontSize: '0.65rem',
-  padding: '3px 6px',
-  borderRadius: '6px',
+  fontSize: '0.7rem',
+  padding: '4px 8px',
+  borderRadius: '8px',
   fontWeight: 'bold',
   zIndex: 5,
   fontFamily: 'Noto Sans TC, sans-serif',
+  boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
 });
 
-const chartDayLabelsStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#aaa', marginTop: '28px', fontFamily: 'Nunito, sans-serif' };
+const chartDayLabelsStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: COLORS.textGrey, marginTop: '35px', fontFamily: 'Nunito, sans-serif', fontWeight:'500' };
 
 const keyDatesCardStyle: React.CSSProperties = {
-  marginTop: '20px',
-  backgroundColor: '#fffdf9',
-  borderRadius: '12px',
-  padding: '15px',
-  border: '1px solid #f0f0f0',
+  marginTop: '25px',
+  backgroundColor: COLORS.bgCard,
+  borderRadius: '18px',
+  padding: '20px',
+  border: `1px solid ${COLORS.border}`,
 };
 
-const keyDatesTitleStyle: React.CSSProperties = { margin: '0 0 12px 0', fontSize: '1rem', color: '#444', fontWeight: 'bold' };
-const keyDateItemStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', fontSize: '0.9rem' };
+const keyDatesTitleStyle: React.CSSProperties = { margin: '0 0 15px 0', fontSize: '1.05rem', color: COLORS.textDark, fontWeight: 'bold' };
+const keyDateItemStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '0.95rem' };
 
-const keyDateLabelStyle = (color: string, bg?: string): React.CSSProperties => ({
+const keyDateLabelStyle = (color: string, bg: string): React.CSSProperties => ({
   color: color,
   fontWeight: 'bold',
-  backgroundColor: bg || 'transparent',
-  padding: bg ? '2px 6px' : '0',
-  borderRadius: '4px',
+  backgroundColor: bg,
+  padding: '4px 10px',
+  borderRadius: '8px',
 });
 
 const keyDateValueStyle = (color?: string): React.CSSProperties => ({
   fontFamily: 'Nunito, sans-serif',
-  fontWeight: color ? 'bold' : 'normal',
-  color: color || '#555',
+  fontWeight: color ? '800' : '600',
+  color: color || COLORS.textDark,
+  fontSize:'1rem'
 });
 
 const calendarCardStyle: React.CSSProperties = {
   ...baseCardStyle,
-  marginTop: '20px',
+  marginTop: '25px',
+  padding: '25px'
 };
 
-const calendarNavStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', marginBottom: '15px', alignItems: 'center' };
-const monthTitleStyle: React.CSSProperties = { fontSize: '1.2rem', fontWeight: 'bold' };
+const calendarHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: `1px solid ${COLORS.border}`, paddingBottom: '15px' };
+const calendarNavStyle: React.CSSProperties = { display: 'flex', gap: '15px', alignItems: 'center' };
+const monthTitleStyle: React.CSSProperties = { fontSize: '1.1rem', fontWeight: '800', color: COLORS.textDark, fontFamily: 'Nunito, sans-serif' };
 const navButtonStyle: React.CSSProperties = {
-  background: '#f5f5f5',
+  background: COLORS.primaryLight,
   border: 'none',
-  padding: '8px 14px',
+  width: '32px',
+  height: '32px',
   borderRadius: '10px',
   cursor: 'pointer',
-  color: '#555',
+  color: COLORS.primary,
   fontFamily: 'Nunito, sans-serif',
   fontWeight: 'bold',
   fontSize: '1rem',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: 'background-color 0.2s',
 };
-const calendarGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' };
-const dayNameStyle: React.CSSProperties = { textAlign: 'center', fontSize: '0.85rem', color: '#999', marginBottom: '5px' };
+const calendarGridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' };
+const dayNameStyle: React.CSSProperties = { textAlign: 'center', fontSize: '0.9rem', color: COLORS.textGrey, marginBottom: '10px', fontWeight: 'bold' };
 
 const calendarDayStyle = (isCurrentMonth: boolean, isToday: boolean, phase: PhaseDefinition | undefined): React.CSSProperties => {
   const base: React.CSSProperties = {
-    minHeight: '55px',
-    borderRadius: '10px',
+    minHeight: '58px',
+    borderRadius: '14px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    opacity: isCurrentMonth ? 1 : 0.4,
+    opacity: isCurrentMonth ? 1 : 0.3,
     cursor: phase ? 'pointer' : 'default',
-    transition: 'background-color 0.2s, box-shadow 0.2s',
-    ...((!isToday && phase) && { backgroundColor: phase.lightColor, color: '#333' }),
-    ...(isToday && { backgroundColor: '#555555', color: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }),
+    transition: 'all 0.2s ease',
+    border: '1px solid transparent',
+    ...((!isToday && phase) && { backgroundColor: phase.lightColor, color: COLORS.textDark }),
+    ...(isToday && { backgroundColor: COLORS.primary, color: 'white', boxShadow: `0 4px 10px ${COLORS.primary}66`, border: 'none' }),
   };
   return base;
 };
 
 const calendarDayNumberStyle = (isToday: boolean, isCurrentMonth: boolean): React.CSSProperties => ({
-  fontSize: '1rem',
+  fontSize: '1.1rem',
   marginBottom: '4px',
   fontFamily: 'Nunito, sans-serif',
-  color: isToday ? 'white' : (isCurrentMonth ? '#333' : '#aaa'),
+  fontWeight: isToday ? '800' : '600',
+  color: isToday ? 'white' : (isCurrentMonth ? COLORS.textDark : COLORS.textGrey),
 });
 
 const phaseDotStyle = (color: string): React.CSSProperties => ({
   backgroundColor: color,
-  height: '5px',
-  borderRadius: '2.5px',
-  width: '80%',
+  height: '6px',
+  borderRadius: '3px',
+  width: '70%',
   margin: '0 auto',
-  marginBottom: '2px',
+  marginBottom: '3px',
 });
 
 const recordDotStyle = (isToday: boolean, accent?: string): React.CSSProperties => ({
-  width: '6px',
-  height: '6px',
+  width: '7px',
+  height: '7px',
   borderRadius: '50%',
   position: 'absolute',
-  bottom: '4px',
-  right: '4px',
-  backgroundColor: isToday ? 'white' : accent || '#888',
-  boxShadow: '0 0 2px rgba(0,0,0,0.2)',
+  bottom: '5px',
+  right: '5px',
+  backgroundColor: isToday ? 'white' : accent || COLORS.textGrey,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
 });
 
-const gridContainerStyle: React.CSSProperties = { display: 'flex', gap: '15px', flexWrap: 'wrap', marginTop: '20px' };
+const gridContainerStyle: React.CSSProperties = { display: 'flex', gap: '20px', flexWrap: 'wrap', marginTop: '25px' };
 const predictionCardStyle = (borderColor: string): React.CSSProperties => ({
   ...baseCardStyle,
   flex: 1,
-  padding: '20px',
-  borderTop: `4px solid ${borderColor}`,
-  minWidth: '250px',
+  padding: '25px',
+  borderTop: `5px solid ${borderColor}`,
+  minWidth: '260px',
 });
 
 const recordInputCardStyle = (borderColor: string): React.CSSProperties => ({
   ...baseCardStyle,
   flex: 1,
-  padding: '20px',
-  borderTop: `4px solid ${borderColor}`,
-  minWidth: '250px',
+  padding: '25px',
+  borderTop: `5px solid ${borderColor}`,
+  minWidth: '260px',
 });
 
-const predictionLabelStyle: React.CSSProperties = { fontSize: '0.9rem', color: '#888', marginBottom: '4px' };
+const predictionLabelStyle: React.CSSProperties = { fontSize: '0.95rem', color: COLORS.textGrey, marginBottom: '8px', fontWeight:'500' };
 const predictionDateStyle = (color: string): React.CSSProperties => ({
-  fontSize: '1.4rem',
-  fontWeight: 'bold',
+  fontSize: '1.6rem',
+  fontWeight: '800',
   fontFamily: 'Nunito, sans-serif',
   color: color,
 });
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  padding: '10px',
-  borderRadius: '8px',
-  border: '1px solid #ddd',
+  padding: '12px 15px',
+  borderRadius: '12px',
+  border: `1px solid ${COLORS.border}`,
   boxSizing: 'border-box',
   fontFamily: 'Noto Sans TC, sans-serif',
-  marginTop: '5px',
+  marginTop: '8px',
+  fontSize: '1rem',
+  color: COLORS.textDark,
+  backgroundColor: '#F8F9FC',
+  outline: 'none',
+};
+
+const textareaStyle: React.CSSProperties = {
+  ...inputStyle,
+  resize: 'vertical',
+  lineHeight: '1.6'
 };
 
 const recordButtonStyle: React.CSSProperties = {
   width: '100%',
-  padding: '12px',
-  backgroundColor: '#5A67D8',
+  padding: '14px',
+  backgroundColor: COLORS.accent,
   color: 'white',
   border: 'none',
-  borderRadius: '8px',
-  marginTop: '15px',
-  fontSize: '1rem',
+  borderRadius: '14px',
+  marginTop: '20px',
+  fontSize: '1.05rem',
   fontWeight: 'bold',
   cursor: 'pointer',
-  transition: 'background-color 0.2s',
-  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+  transition: 'all 0.2s',
+  boxShadow: `0 4px 12px ${COLORS.accent}40`,
 };
 
 const symptomCardStyle: React.CSSProperties = {
   ...baseCardStyle,
-  padding: '20px 25px',
-};
-
-const listListStyle: React.CSSProperties = {
-  paddingLeft: '20px',
-  lineHeight: '1.8',
-  color: '#555',
-  margin: 0,
-  fontSize: '0.95rem',
-  listStyleType: 'disc',
+  padding: '25px',
 };
 
 const modalOverlayStyle: React.CSSProperties = {
@@ -1289,75 +1341,77 @@ const modalOverlayStyle: React.CSSProperties = {
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.6)',
+  backgroundColor: 'rgba(51, 51, 68, 0.5)', // 使用深藍灰色半透明
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   zIndex: 1000,
-  backdropFilter: 'blur(3px)',
+  backdropFilter: 'blur(4px)',
 };
 
 const modalContentStyle: React.CSSProperties = {
-  backgroundColor: 'white',
-  padding: '30px',
-  borderRadius: '16px',
+  backgroundColor: COLORS.bgCard,
+  padding: '35px',
+  borderRadius: '28px',
   maxWidth: '90%',
-  width: '380px',
-  boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+  width: '400px',
+  boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
 };
+
+const modalHeaderStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom:'20px'};
+
+const modalCloseButtonStyle: React.CSSProperties = {
+    background: 'none',
+    border: 'none',
+    fontSize: '24px',
+    color: COLORS.textGrey,
+    cursor: 'pointer',
+    padding: '0',
+    lineHeight: 1,
+}
 
 const modalTitleStyle = (color: string): React.CSSProperties => ({
   color: color,
-  marginBottom: '10px',
-  fontSize: '1.4rem',
-  fontWeight: 'bold',
+  margin: 0,
+  fontSize: '1.6rem',
+  fontWeight: '800',
 });
 
-const modalPhaseDetailStyle: React.CSSProperties = { marginBottom: '5px', fontSize: '0.95rem', color: '#666' };
-const modalCycleDayStyle: React.CSSProperties = { fontFamily: 'Nunito, sans-serif', fontWeight: 'bold' };
-const modalRecordSectionStyle: React.CSSProperties = { marginTop: '25px', paddingTop: '15px', borderTop: '1px solid #eee' };
-const modalRecordTitleStyle: React.CSSProperties = { color: '#555', marginBottom: '20px', fontSize: '1.1rem' };
-const modalNoteLabelStyle: React.CSSProperties = { display: 'block', fontSize: '0.9rem', color: '#555' };
-const modalEditLabelStyle: React.CSSProperties = { display: 'block', margin: '15px 0 5px', fontSize: '1rem', color: '#444', fontWeight: 'bold' };
+const modalPhaseDetailStyle: React.CSSProperties = { marginBottom: '10px', fontSize: '1rem', color: COLORS.textDark, display:'flex', alignItems:'center' };
+const modalCycleDayStyle: React.CSSProperties = { fontFamily: 'Nunito, sans-serif', fontWeight: '800', fontSize:'1.1rem' };
+const modalRecordSectionStyle: React.CSSProperties = { marginTop: '30px', paddingTop: '25px', borderTop: `1px solid ${COLORS.border}` };
+const modalRecordTitleStyle: React.CSSProperties = { color: COLORS.textDark, marginBottom: '25px', fontSize: '1.15rem', fontWeight:'bold' };
+const modalNoteLabelStyle: React.CSSProperties = { display: 'block', fontSize: '1rem', color: COLORS.textDark, fontWeight:'bold', marginBottom:'8px' };
+const modalEditLabelStyle: React.CSSProperties = { display: 'block', margin: '20px 0 8px', fontSize: '1rem', color: COLORS.textDark, fontWeight: 'bold' };
 
-const modalButtonContainerStyle: React.CSSProperties = { display: 'flex', gap: '10px', marginTop: '30px' };
-
-const modalCancelButtonStyle: React.CSSProperties = {
-  flex: 1,
-  padding: '12px',
-  border: 'none',
-  borderRadius: '8px',
-  color: '#444',
-  fontSize: '1rem',
-  cursor: 'pointer',
-  backgroundColor: '#e0e0e0',
-  fontWeight: 'bold',
-};
+const modalButtonContainerStyle: React.CSSProperties = { marginTop: '35px' };
 
 const modalSaveButtonStyle = (accent: string): React.CSSProperties => ({
-  flex: 1,
-  padding: '12px',
+  width: '100%',
+  padding: '14px',
   border: 'none',
-  borderRadius: '8px',
+  borderRadius: '14px',
   color: 'white',
-  fontSize: '1rem',
+  fontSize: '1.1rem',
   cursor: 'pointer',
   backgroundColor: accent,
   fontWeight: 'bold',
-  transition: 'background-color 0.2s',
+  transition: 'all 0.2s',
+  boxShadow: `0 4px 15px ${accent}50`,
 });
 
-const dropdownButtonStyle = (isActive: boolean): React.CSSProperties => ({
-  padding: '6px 12px',
-  borderRadius: '20px',
-  border: isActive ? '1px solid transparent' : '1px solid #ddd',
-  fontSize: '0.85rem',
+const dropdownButtonStyle = (isActive: boolean, accentColor: string): React.CSSProperties => ({
+  padding: '8px 14px',
+  borderRadius: '25px',
+  border: isActive ? '1px solid transparent' : `1px solid ${COLORS.border}`,
+  fontSize: '0.9rem',
   cursor: 'pointer',
-  backgroundColor: isActive ? '#896CD9' : '#f9f9f9',
-  color: isActive ? 'white' : '#555',
+  backgroundColor: isActive ? accentColor : COLORS.bgCard,
+  color: isActive ? 'white' : COLORS.textDark,
   fontFamily: 'Noto Sans TC, sans-serif',
-  fontWeight: isActive ? 'bold' : 'normal',
+  fontWeight: isActive ? 'bold' : '500',
   transition: 'all 0.2s',
+  boxShadow: isActive ? `0 2px 8px ${accentColor}40` : 'none',
 });
 
 export default PhoebeCycleTracker;
