@@ -1146,11 +1146,89 @@ const PhoebeCycleTracker: React.FC = () => {
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
 
-  // --- Chart Logic ---
+   // --- Chart Logic ---
 
-  const totalDaysForChart = 34;
-  const xForDay = (day: number, width: number) => ((day - 1) / (totalDaysForChart - 1)) * width;
+  // 1) 讓圖表天數跟著你的平均週期走
+  const totalDaysForChart = averageCycleLength;
 
+  const xForDay = (day: number, width: number) =>
+    ((day - 1) / (totalDaysForChart - 1)) * width;
+
+  const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
+
+  // 2) 用「黃體期約 14 天」推估排卵期位置（排卵 ≈ 下次月經前 14 天）
+  //    排卵窗口抓 3 天（你可改 2～4 天）
+  const periodEndDay = clamp(currentPeriodLength, 3, 10);
+
+  const ovulationCenterDay = clamp(
+    totalDaysForChart - 14,
+    periodEndDay + 6,          // 避免太靠近生理期
+    totalDaysForChart - 10     // 避免太靠近結尾
+  );
+
+  const ovulationStartDay = clamp(ovulationCenterDay - 1, 1, totalDaysForChart);
+  const ovulationEndDay = clamp(ovulationCenterDay + 1, 1, totalDaysForChart);
+
+  // 3) PMS 起點：下次生理期前 7 天（你可以改成 5 / 6 / 8 / 10）
+  const pmsWindowDays = 7;
+  const pmsStartDay = clamp(totalDaysForChart - pmsWindowDays + 1, 1, totalDaysForChart);
+  const pmsEndDay = totalDaysForChart;
+
+  // 4) 黃體期：排卵後到 PMS 前
+  const lutealStartDay = clamp(ovulationEndDay + 1, 1, totalDaysForChart);
+  const lutealEndDay = clamp(pmsStartDay - 1, 1, totalDaysForChart);
+
+  // 5) 你的三條「關鍵事件」垂直線，也跟著週期移動
+  //    水腫/食慾開始上升：排卵附近
+  const edemaRiseDay = ovulationStartDay;
+  //    壓力開始上升：黃體期開始
+  const stressRiseDay = lutealStartDay;
+  //    高峰：PMS 開始（也可以改成 pmsStartDay + 1 更像「進入後才爆」）
+  const pmsPeakDay = pmsStartDay;
+
+  const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
+  const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
+  const pmsPeakDateStr = formatShortDate(addDays(lastStartDate, pmsPeakDay - 1));
+
+  // 6) 小工具：線性漸變，讓曲線更像「慢慢上來」
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+  const ramp = (day: number, startDay: number, endDay: number, startV: number, endV: number) => {
+    if (endDay <= startDay) return endV;
+    const t = clamp((day - startDay) / (endDay - startDay), 0, 1);
+    return lerp(startV, endV, t);
+  };
+
+  // 7) 點 → 平滑曲線 path（你已經用過的 Catmull-Rom → Bezier）
+  const pointsToSmoothPath = (pointsStr: string) => {
+    const pts = pointsStr
+      .trim()
+      .split(' ')
+      .map(p => p.split(',').map(Number))
+      .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) as [number, number][];
+
+    if (pts.length < 2) return '';
+
+    const d: string[] = [];
+    d.push(`M ${pts[0][0]} ${pts[0][1]}`);
+
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] || p2;
+
+      const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+      const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+      const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+
+      d.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`);
+    }
+
+    return d.join(' ');
+  };
+
+  // 8) 依照動態階段計算「更貼近現實」的三條曲線
   const getCurvePoints = (
     width: number,
     height: number,
@@ -1161,47 +1239,49 @@ const PhoebeCycleTracker: React.FC = () => {
     for (let day = 1; day <= totalDaysForChart; day++) {
       let intensity = 50;
 
-      // 🍽 食慾：穩定期真的要「低」
+      // —— 生理期：較不穩定但通常「沒那麼飆」——
+      const inPeriod = day <= periodEndDay;
+
+      // —— 濾泡期：較平穩、較好控制 ——
+      const inFollicular = day > periodEndDay && day < ovulationStartDay;
+
+      // —— 排卵期窗口 ——
+      const inOvulation = day >= ovulationStartDay && day <= ovulationEndDay;
+
+      // —— 黃體期（排卵後到 PMS 前） ——
+      const inLuteal = day >= lutealStartDay && day <= lutealEndDay;
+
+      // —— PMS ——
+      const inPms = day >= pmsStartDay;
+
       if (type === 'appetite') {
-        if (day <= 3) intensity = 55;          // 生理期初
-        else if (day <= 6) intensity = 50;     // 生理期後段
-        else if (day <= 14) intensity = 35;    // 濾泡期最低
-        else if (day <= 20) intensity = 40;    // 穩定
-        else if (day <= 24) intensity = 45;    // 微升
-        else if (day <= 27) intensity = 55;    // 排卵後
-        else if (day <= 29) intensity = 65;    // 黃體前段
-        else intensity = 85;                   // PMS 高峰
+        if (inPeriod) intensity = ramp(day, 1, periodEndDay, 55, 50);
+        else if (inFollicular) intensity = ramp(day, periodEndDay + 1, ovulationStartDay - 1, 40, 35);
+        else if (inOvulation) intensity = ramp(day, ovulationStartDay, ovulationEndDay, 40, 55);
+        else if (inLuteal) intensity = ramp(day, lutealStartDay, lutealEndDay, 55, 65);
+        else if (inPms) intensity = ramp(day, pmsStartDay, pmsEndDay, 70, 85);
       }
 
-      // 💜 壓力（原本 hormone）：中段回落、後段再升
-      else if (type === 'hormone') {
-        if (day <= 6) intensity = 55;
-        else if (day <= 14) intensity = 45;
-        else if (day <= 20) intensity = 40;
-        else if (day <= 24) intensity = 45;
-        else if (day <= 27) intensity = 55;
-        else if (day <= 29) intensity = 65;
-        else intensity = 80;
+      if (type === 'hormone') {
+        // 這條你其實定義成「壓力感」比較直覺
+        if (inPeriod) intensity = ramp(day, 1, periodEndDay, 55, 50);
+        else if (inFollicular) intensity = ramp(day, periodEndDay + 1, ovulationStartDay - 1, 48, 40);
+        else if (inOvulation) intensity = ramp(day, ovulationStartDay, ovulationEndDay, 45, 55);
+        else if (inLuteal) intensity = ramp(day, lutealStartDay, lutealEndDay, 55, 65);
+        else if (inPms) intensity = ramp(day, pmsStartDay, pmsEndDay, 68, 80);
       }
 
-      // 💧 水腫：慢慢堆積，不是整段爆
-      else if (type === 'edema') {
-        if (day <= 3) intensity = 30;
-        else if (day <= 6) intensity = 40;
-        else if (day <= 14) intensity = 25;    // 最輕盈
-        else if (day <= 20) intensity = 35;
-        else if (day <= 24) intensity = 45;
-        else if (day <= 27) intensity = 55;
-        else if (day <= 29) intensity = 65;
-        else intensity = 85;
+      if (type === 'edema') {
+        if (inPeriod) intensity = ramp(day, 1, periodEndDay, 35, 30);
+        else if (inFollicular) intensity = ramp(day, periodEndDay + 1, ovulationStartDay - 1, 30, 25);
+        else if (inOvulation) intensity = ramp(day, ovulationStartDay, ovulationEndDay, 30, 55);
+        else if (inLuteal) intensity = ramp(day, lutealStartDay, lutealEndDay, 55, 65);
+        else if (inPms) intensity = ramp(day, pmsStartDay, pmsEndDay, 70, 85);
       }
 
       const x = xForDay(day, width);
       const y = height - (intensity / 100) * height;
-
-      // 🛡 防止 NaN 導致整條線不畫
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-
       points.push(`${x},${y}`);
     }
 
@@ -1473,38 +1553,87 @@ const PhoebeCycleTracker: React.FC = () => {
             {/* Today Marker */}
             <line x1={xForDay(chartDaysPassed, 340)} y1="0" x2={xForDay(chartDaysPassed, 340)} y2="150" stroke={COLORS.textDark} strokeWidth="2" strokeDasharray="4,2" />
 
-            {/* Critical Events */}
-            <line x1={xForDay(edemaRiseDay, 340)} y1="0" x2={xForDay(edemaRiseDay, 340)} y2="150" stroke={COLORS.chartBlue} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.5" />
-            <line x1={xForDay(stressRiseDay, 340)} y1="0" x2={xForDay(stressRiseDay, 340)} y2="150" stroke={COLORS.chartPurple} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.5" />
-            <line x1={xForDay(pmsPeakDay, 340)} y1="0" x2={xForDay(pmsPeakDay, 340)} y2="150" stroke={COLORS.accent} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.8" />
+{/* Critical Events */}
+<line
+  x1={xForDay(ovulationStartDay, 340)}
+  y1="0"
+  x2={xForDay(ovulationStartDay, 340)}
+  y2="150"
+  stroke={COLORS.chartBlue}
+  strokeWidth="1.5"
+  strokeDasharray="3,3"
+  opacity="0.5"
+/>
+
+<line
+  x1={xForDay(lutealStartDay, 340)}
+  y1="0"
+  x2={xForDay(lutealStartDay, 340)}
+  y2="150"
+  stroke={COLORS.chartPurple}
+  strokeWidth="1.5"
+  strokeDasharray="3,3"
+  opacity="0.5"
+/>
+
+<line
+  x1={xForDay(pmsStartDay, 340)}
+  y1="0"
+  x2={xForDay(pmsStartDay, 340)}
+  y2="150"
+  stroke={COLORS.accent}
+  strokeWidth="1.5"
+  strokeDasharray="3,3"
+  opacity="0.8"
+/>
+
           </svg>
 
           <div style={todayMarkerStyle(xForDay(chartDaysPassed, 340))}>今天</div>
         </div>
 
-        <div style={chartDayLabelsStyle}>
-          <span>Day 1</span>
-          <span>Day 14</span>
-          <span>Day 28</span>
-          <span>Day 34</span>
-        </div>
+<div style={chartDayLabelsStyle}>
+  <span>Day 1</span>
+  <span>排卵 (Day {ovulationCenterDay})</span>
+  <span>PMS (Day {pmsStartDay})</span>
+  <span>Day {totalDaysForChart}</span>
+</div>
 
-        <div style={keyDatesCardStyle}>
-          <h4 style={keyDatesTitleStyle}>📅 關鍵預測日期</h4>
-          <div style={keyDateItemStyle}>
-            <span style={keyDateLabelStyle(COLORS.chartBlue, COLORS.primaryLight)}>💧 水腫與食慾明顯上升</span>
-            <span style={keyDateValueStyle()}>{edemaRiseDateStr} (Day 25)</span>
-          </div>
-          <div style={keyDateItemStyle}>
-            <span style={keyDateLabelStyle(COLORS.chartPurple, COLORS.primaryLight)}>💜 壓力開始明顯上升</span>
-            <span style={keyDateValueStyle()}>{stressRiseDateStr} (Day 28)</span>
-          </div>
-          <div style={keyDateItemStyle}>
-            <span style={keyDateLabelStyle(COLORS.accentDark, '#FFF0ED')}>🔥 PMS 全面高峰</span>
-            <span style={keyDateValueStyle(COLORS.accentDark)}>{pmsPeakDateStr} (Day 30)</span>
-          </div>
-        </div>
-      </div>
+<div style={keyDatesCardStyle}>
+  <h4 style={keyDatesTitleStyle}>📅 週期關鍵窗口（提醒你準備，不是用來責備自己）</h4>
+
+  <div style={keyDateItemStyle}>
+    <span style={keyDateLabelStyle(COLORS.chartBlue, COLORS.primaryLight)}>🥚 排卵窗口（可能的 3 天）</span>
+    <span style={keyDateValueStyle()}>
+      {formatShortDate(addDays(lastStartDate, ovulationStartDay - 1))} ～ {formatShortDate(addDays(lastStartDate, ovulationEndDay - 1))}
+      {' '} (Day {ovulationStartDay}–{ovulationEndDay})
+    </span>
+  </div>
+  <div style={{ marginTop: -6, marginBottom: 12, fontSize: '0.88rem', color: COLORS.textGrey, lineHeight: 1.5 }}>
+    小提醒：這幾天如果覺得悶、腫、敏感，是「轉換期」常見反應，不用硬撐。
+  </div>
+
+  <div style={keyDateItemStyle}>
+    <span style={keyDateLabelStyle(COLORS.chartPurple, COLORS.primaryLight)}>🌙 黃體期開始（身體可能變敏感）</span>
+    <span style={keyDateValueStyle()}>
+      {formatShortDate(addDays(lastStartDate, lutealStartDay - 1))} (Day {lutealStartDay})
+    </span>
+  </div>
+  <div style={{ marginTop: -6, marginBottom: 12, fontSize: '0.88rem', color: COLORS.textGrey, lineHeight: 1.5 }}>
+    小提醒：先把「安全點心 / 熱茶 / 鎂 / 早睡」準備好，會比事後補救輕鬆很多。
+  </div>
+
+  <div style={keyDateItemStyle}>
+    <span style={keyDateLabelStyle(COLORS.accentDark, '#FFF0ED')}>🔥 PMS 可能開始（先準備安全感）</span>
+    <span style={keyDateValueStyle(COLORS.accentDark)}>
+      {formatShortDate(addDays(lastStartDate, pmsStartDay - 1))} (Day {pmsStartDay})
+    </span>
+  </div>
+  <div style={{ marginTop: -6, marginBottom: 0, fontSize: '0.88rem', color: COLORS.textGrey, lineHeight: 1.5 }}>
+    小提醒：把成功標準改成「穩住就好」——沒有失控，就是很大的成功。
+  </div>
+</div>
+
 
       <div style={calendarCardStyle}>
         <div style={calendarHeaderStyle}>
