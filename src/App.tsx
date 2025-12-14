@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 
 // ==========================================
-// 1. 基礎設定與常數
+// 1. 基礎設定與常數 (最優先定義)
 // ==========================================
 
 const LOCAL_STORAGE_KEY = "phoebeCycleHistory";
@@ -58,7 +58,6 @@ type PhaseKey = "period" | "follicular" | "ovulation" | "luteal" | "pms";
 
 interface PhaseDefinition {
   name: string;
-  key: PhaseKey;
   startDay: number;
   endDay: number;
   symptoms: string[];
@@ -69,6 +68,7 @@ interface PhaseDefinition {
   lightColor: string;
   hormone: string;
   accent: string;
+  key: PhaseKey;
 }
 
 interface CycleRecord {
@@ -120,6 +120,7 @@ const SYMPTOM_OPTIONS: Record<"appetite" | "mood" | "body" | "sleep", string[]> 
   sleep: ["良好", "普通", "睡不好"],
 };
 
+// 這是「基礎」規則，會被動態生成函式覆蓋，但保留作為參考
 const PHASE_SUPPORT: Record<PhaseKey, PhaseSupport> = {
   period: {
     explanation: "今天比較累或想休息，是荷爾蒙低點的正常反應，不代表妳變弱。",
@@ -154,26 +155,14 @@ const PHASE_SUPPORT: Record<PhaseKey, PhaseSupport> = {
 };
 
 // ==========================================
-// 核心邏輯：動態規則生成器 (解決 Bug 的關鍵)
+// 核心邏輯：動態規則生成器
 // ==========================================
 
 const generatePhaseRules = (cycleLength: number, periodLength: number): PhaseDefinition[] => {
-  // 基礎參數：黃體期約 14 天，PMS 約前 5-7 天，排卵期約 3 天
-  const lutealLength = 14; 
-  const pmsLength = 5;
-  const ovulationLength = 3;
-
-  // 計算關鍵轉折點 (全部基於 cycleLength 倒推)
-  const pmsStart = cycleLength - pmsLength + 1; // e.g., 34 - 5 + 1 = Day 30
-  const lutealStart = cycleLength - lutealLength + 1; // e.g., 34 - 14 + 1 = Day 21 (但通常排卵後才算)
-  
-  // 修正：排卵日在黃體期前。
-  // 排卵日通常是倒數第 14 天。排卵期窗口設為排卵日前後。
-  // Day 1 = Period Start. 
-  // Ovulation Day ~= cycleLength - 14.
   const ovulationDay = cycleLength - 14; 
   const ovulationStart = ovulationDay - 1; 
   const ovulationEnd = ovulationDay + 1;
+  const pmsStart = cycleLength - 5 + 1; // 假設 PMS 為期 5 天
 
   // 確保階段不重疊的邊界
   const follicularEnd = ovulationStart - 1;
@@ -216,7 +205,7 @@ const generatePhaseRules = (cycleLength: number, periodLength: number): PhaseDef
       endDay: ovulationEnd,
       color: COLORS.ovulation,
       lightColor: "#FFFBEB",
-      accent: "#E0C25E", // Darker yellow for text
+      accent: "#E0C25E",
       hormone: "黃體生成素(LH)高峰",
       tips: "這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。",
       symptoms: ["下腹悶、體溫升高", "出現微水腫"],
@@ -241,7 +230,7 @@ const generatePhaseRules = (cycleLength: number, periodLength: number): PhaseDef
       name: "PMS 高峰",
       key: "pms",
       startDay: pmsStart,
-      endDay: cycleLength, // 延伸到週期最後一天
+      endDay: cycleLength,
       color: COLORS.pms,
       lightColor: "#FFF0F3",
       accent: COLORS.pms,
@@ -348,8 +337,8 @@ const recentBarFillStyle = (percent: number): React.CSSProperties => ({ width: `
 const chartCardStyle: React.CSSProperties = { ...baseCardStyle, marginTop: "25px", padding: "25px 20px 30px" };
 const chartHeaderStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", padding: "0 5px" };
 const chartLegendStyle: React.CSSProperties = { fontSize: "0.8rem", color: COLORS.textGrey, display: "flex", gap: "12px", alignItems: "center" };
-const todayMarkerStyle = (x: number): React.CSSProperties => ({
-  position: "absolute", left: `calc(${x}% - 18px)`, bottom: "-28px", backgroundColor: COLORS.textDark, color: "white", fontSize: "0.7rem", padding: "4px 8px", borderRadius: "8px", fontWeight: "bold", zIndex: 5, fontFamily: "Noto Sans TC, sans-serif", boxShadow: "0 2px 5px rgba(0,0,0,0.2)"
+const todayMarkerStyle = (xPercent: number): React.CSSProperties => ({
+  position: "absolute", left: `calc(${xPercent}% - 18px)`, bottom: "-28px", backgroundColor: COLORS.textDark, color: "white", fontSize: "0.7rem", padding: "4px 8px", borderRadius: "8px", fontWeight: "bold", zIndex: 5, fontFamily: "Noto Sans TC, sans-serif", boxShadow: "0 2px 5px rgba(0,0,0,0.2)"
 });
 const chartDayLabelsStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: COLORS.textGrey, marginTop: "35px", fontFamily: "Nunito, sans-serif", fontWeight: 500 };
 
@@ -417,6 +406,14 @@ const dropdownButtonStyle = (isActive: boolean, accentColor: string): React.CSSP
 
 const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
 
+const phaseNameToKey = (name: string): PhaseKey => {
+  if (name.includes("生理期")) return "period";
+  if (name.includes("濾泡期")) return "follicular";
+  if (name.includes("排卵期")) return "ovulation";
+  if (name.includes("黃體期")) return "luteal";
+  return "pms";
+};
+
 const isValidYMD = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
 const parseLocalDate = (dateStr: unknown): Date => {
   if (!isValidYMD(dateStr)) return new Date();
@@ -447,22 +444,6 @@ const startOfMonth = (date: Date): Date => new Date(date.getFullYear(), date.get
 const endOfMonth = (date: Date): Date => new Date(date.getFullYear(), date.getMonth() + 1, 0);
 const createEmptyRecord = (date: string): SymptomRecord => ({ date, appetite: "", mood: "", body: "", sleep: "", notes: "" });
 
-// 關鍵修改：日曆的循環邏輯
-const findCycleIndexForDate = (history: CycleRecord[], dateStr: string): number => {
-  const sorted = normalizeHistory(history);
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    if (dateStr >= sorted[i].startDate) return i;
-  }
-  return -1;
-};
-
-// 修正後：支援輸入週期長度，讓日曆和卡片一致
-const getRulesForCycle = (cycleLength: number, periodLength: number): PhaseDefinition[] => {
-    // 透過傳入的 cycleLength 動態計算
-    const rules = generatePhaseRules(cycleLength, periodLength);
-    return rules;
-};
-
 const normalizeHistory = (list: CycleRecord[]): CycleRecord[] => {
   const sorted = [...list]
     .filter((x): x is CycleRecord => !!x && isValidYMD(x.startDate))
@@ -477,6 +458,16 @@ const normalizeHistory = (list: CycleRecord[]): CycleRecord[] => {
 };
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
+// 補回缺失的 findCycleIndexForDate
+const findCycleIndexForDate = (history: CycleRecord[], dateStr: string): number => {
+  const sorted = normalizeHistory(history);
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (dateStr >= sorted[i].startDate) return i;
+  }
+  return -1;
+};
+
+// Catmull-Rom -> Bezier
 const pointsToSmoothPath = (pointsStr: string) => {
   const pts = pointsStr.trim().split(" ").map((p) => p.split(",").map(Number)).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) as [number, number][];
   if (pts.length < 2) return "";
@@ -574,7 +565,6 @@ const App: React.FC = () => {
   const currentRules = useMemo(() => generatePhaseRules(averageCycleLength, currentPeriodLength), [averageCycleLength, currentPeriodLength]);
   
   const currentPhase = useMemo(() => {
-    // 這裡也要處理超過週期天數的狀況 (Day 35 -> Day 1)
     let cycleDay = daysPassed;
     if (cycleDay > averageCycleLength) {
         cycleDay = ((daysPassed - 1) % averageCycleLength) + 1;
@@ -616,7 +606,7 @@ const App: React.FC = () => {
 
   const getSymptomRecordForDate = useCallback((dateStr: string) => symptomRecords.find((r) => r.date === dateStr), [symptomRecords]);
 
-  // ★ 修正後的日曆階段預測邏輯 ★
+  // ★ 修正後的日曆階段預測邏輯 (確保日曆不會白畫面) ★
   const getPhaseForDate = useCallback((date: Date): PhaseDefinition | undefined => {
       const dateStr = formatLocalDate(date);
       const idx = findCycleIndexForDate(history, dateStr);
@@ -642,7 +632,31 @@ const App: React.FC = () => {
       return undefined;
   }, [history, averageCycleLength]);
 
-  // ... (Handlers same as before) ...
+  // ★ 補回缺失的 generateCalendarDays (這是白畫面元兇之一) ★
+  const generateCalendarDays = useMemo(() => {
+    const start = startOfMonth(currentMonth);
+    const end = endOfMonth(currentMonth);
+    const days: Date[] = [];
+    const firstDay = start.getDay(); // 0=Sun
+    for (let i = 0; i < firstDay; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() - (firstDay - i));
+        days.push(d);
+    }
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        days.push(new Date(d));
+    }
+    // 補滿到最後一週
+    while (days.length % 7 !== 0) {
+        const last = days[days.length - 1];
+        const next = new Date(last);
+        next.setDate(last.getDate() + 1);
+        days.push(next);
+    }
+    return days;
+  }, [currentMonth]);
+
+  // ... (Handlers) ...
   const handleDateClick = (date) => {
     const dateStr = formatLocalDate(date);
     const phase = getPhaseForDate(date);
@@ -672,7 +686,7 @@ const App: React.FC = () => {
     else { if (idx !== -1) newRecords[idx] = currentRecord; else newRecords.push(currentRecord); }
     setSymptomRecords(newRecords); setModalDetail(null);
   };
-  const handleUpsertPeriodRecord = () => { /* Logic simplified for brevity, assume same as before */ 
+  const handleUpsertPeriodRecord = () => {
      if (!isValidYMD(inputDate)) return;
     const newDateStr = inputDate;
     const newDateObj = parseLocalDate(newDateStr);
@@ -691,7 +705,7 @@ const App: React.FC = () => {
     updated.push({ id: Date.now().toString(), startDate: newDateStr, length: null, periodLength: 6 });
     setHistory(normalizeHistory(updated)); setCurrentMonth(newDateObj);
   };
-  const handleSaveEdit = () => { /* Logic simplified */ 
+  const handleSaveEdit = () => {
      if (!isValidYMD(editDate)) return;
     const updated = [...history];
     const lastIdx = updated.length - 1;
@@ -774,7 +788,9 @@ const App: React.FC = () => {
       <div style={dashboardCardStyle}>
         <div style={todayStatusContainerStyle}>
           <div>
-            <span style={todayLabelStyle}>{parseLocalDate(todayStr).toLocaleDateString("zh-TW", { month: "long" })}</span>
+            <span style={todayLabelStyle}>
+              {parseLocalDate(todayStr).toLocaleDateString("zh-TW", { month: "long" })}
+            </span>
             <div style={todayDateStyle}>{parseLocalDate(todayStr).getDate()}日</div>
           </div>
           <button onClick={() => { setEditDate(lastStartDate); setEditMode(true); }} style={editCycleButtonStyle}>
@@ -888,7 +904,6 @@ const App: React.FC = () => {
               {dayNames.map((n, i) => <div key={i} style={dayNameStyle}>{n}</div>)}
               {generateCalendarDays.map((date, i) => {
                   const dateStr = formatLocalDate(date);
-                  // 這裡使用修正後的 getPhaseForDate
                   const phase = getPhaseForDate(date);
                   const record = getSymptomRecordForDate(dateStr);
                   const isToday = dateStr === todayStr;
@@ -935,7 +950,11 @@ const RecordDropdown: React.FC<any> = ({ label, options, value, onChange, accent
     </label>
     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
       {options.map((op: string) => (
-        <button key={op} onClick={() => onChange(value === op ? "" : op)} style={dropdownButtonStyle(value === op, accentColor)}>
+        <button
+          key={op}
+          onClick={() => onChange(value === op ? "" : op)}
+          style={dropdownButtonStyle(value === op, accentColor)}
+        >
           {op}
         </button>
       ))}
