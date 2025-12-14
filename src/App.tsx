@@ -16,10 +16,10 @@ interface PhaseDefinition {
   diet: string[];
   care: string[];
   tips: string;
-  color: string;      // 用於文字、圖標、深色背景
-  lightColor: string; // 用於淺色背景區塊
+  color: string;
+  lightColor: string;
   hormone: string;
-  accent: string;     // 用於強調、按鈕
+  accent: string;
 }
 
 interface CycleRecord {
@@ -70,22 +70,21 @@ const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
 const MENTAL_STORAGE_KEY = 'phoebeMentalRecords';
 
-// 全新配色方案 (藍紫 + 蜜桃)
+// 配色方案
 const COLORS = {
   primary: '#7F8CE0',   // 主藍紫色
   primaryLight: '#E8EAF6',
-  accent: '#FFAD8F',    // 蜜桃珊瑚色 (強調用)
+  accent: '#FFAD8F',    // 蜜桃珊瑚色
   accentDark: '#E69A7E',
   textDark: '#333344',
   textGrey: '#7A7A9D',
-  bgApp: '#F4F5FA',     // 極淺藍灰背景
+  bgApp: '#F4F5FA',
   bgCard: '#FFFFFF',
   border: '#EBEBF4',
   
-  // Chart Colors
-  chartOrange: '#FFAD8F', // 食慾 (蜜桃)
-  chartPurple: '#7F8CE0', // 壓力 (藍紫)
-  chartBlue: '#7FCCC3',   // 水腫 (青綠)
+  chartOrange: '#FFAD8F',
+  chartPurple: '#7F8CE0',
+  chartBlue: '#7FCCC3',
 };
 
 const PHASE_RULES: PhaseDefinition[] = [
@@ -97,7 +96,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     diet: ['食慾偏低/正常', '想吃冰(荷爾蒙反應)'],
     care: ['不逼自己運動', '多喝暖身飲', '早餐多一點蛋白質'],
     tips: '這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。',
-    color: '#B5A0D9',      // 柔和紫丁香
+    color: '#B5A0D9',
     lightColor: '#F2EFF9',
     hormone: '雌激素與黃體素低點',
     accent: '#B5A0D9',
@@ -110,7 +109,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     diet: ['食慾最低', '最好控制', '飽足感良好'],
     care: ['適合減脂/建立習慣', 'Zumba/伸展效果好'],
     tips: '現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！',
-    color: '#7FCCC3',      // 清新薄荷綠
+    color: '#7FCCC3',
     lightColor: '#EDF7F6',
     hormone: '雌激素逐漸上升',
     accent: '#7FCCC3',
@@ -123,7 +122,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     diet: ['食慾微增', '有些人想吃甜'],
     care: ['多喝水、多吃蔬菜', '補充可溶性纖維'],
     tips: '這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。',
-    color: '#F6D776',      // 溫暖日光黃
+    color: '#F6D776',
     lightColor: '#FFFBEB',
     hormone: '黃體生成素(LH)高峰',
     accent: '#E0C25E',
@@ -136,7 +135,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     diet: ['開始嘴饞', '想吃頻率變高'],
     care: ['早餐加蛋白質', '下午備好安全點心'],
     tips: '提前兩天準備，比發生後補救更有效。',
-    color: '#7F8CE0',      // 主藍紫色
+    color: '#7F8CE0',
     lightColor: '#E8EAF6',
     hormone: '黃體素開始上升',
     accent: '#7F8CE0',
@@ -149,7 +148,7 @@ const PHASE_RULES: PhaseDefinition[] = [
     diet: ['想吃甜、想吃冰', '正餐後仍想吃'],
     care: ['補充鎂(減少焦慮)', '允許多吃 5～10%', '熱茶/小毯子/深呼吸'],
     tips: '這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。',
-    color: '#E07F8C',      // 柔和玫瑰紅
+    color: '#E07F8C',
     lightColor: '#FFF0F3',
     hormone: '黃體素高峰 / 準備下降',
     accent: '#E07F8C',
@@ -303,7 +302,6 @@ const findCycleIndexForDate = (history: CycleRecord[], dateStr: string): number 
 // --- 4. Main Component ---
 
 const PhoebeCycleTracker: React.FC = () => {
-  // ... (State & Effects) ...
   useEffect(() => {
     const link = document.createElement('link');
     link.href =
@@ -630,8 +628,6 @@ const PhoebeCycleTracker: React.FC = () => {
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 
-  // --- Render ---
-
   return (
     <div style={appContainerStyle}>
       <header style={headerStyle}>
@@ -760,20 +756,16 @@ const PhoebeCycleTracker: React.FC = () => {
 
         <div style={{ position: 'relative', height: '150px', marginTop:'10px' }}>
           <svg viewBox="0 0 340 150" style={{ width: '100%', height: '100%', overflow: 'visible' }} preserveAspectRatio="none">
-            {/* Grid Lines */}
             <line x1="0" y1="37.5" x2="340" y2="37.5" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
             <line x1="0" y1="75" x2="340" y2="75" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
             <line x1="0" y1="112.5" x2="340" y2="112.5" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
 
-            {/* Data Lines */}
             <polyline points={getCurvePoints(340, 150, 'appetite')} fill="none" stroke={COLORS.chartOrange} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             <polyline points={getCurvePoints(340, 150, 'hormone')} fill="none" stroke={COLORS.chartPurple} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
             <polyline points={getCurvePoints(340, 150, 'edema')} fill="none" stroke={COLORS.chartBlue} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
-            {/* Today Marker */}
             <line x1={xForDay(chartDaysPassed, 340)} y1="0" x2={xForDay(chartDaysPassed, 340)} y2="150" stroke={COLORS.textDark} strokeWidth="2" strokeDasharray="4,2" />
 
-            {/* Critical Events */}
             <line x1={xForDay(edemaRiseDay, 340)} y1="0" x2={xForDay(edemaRiseDay, 340)} y2="150" stroke={COLORS.chartBlue} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.5" />
             <line x1={xForDay(stressRiseDay, 340)} y1="0" x2={xForDay(stressRiseDay, 340)} y2="150" stroke={COLORS.chartPurple} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.5" />
             <line x1={xForDay(pmsPeakDay, 340)} y1="0" x2={xForDay(pmsPeakDay, 340)} y2="150" stroke={COLORS.accent} strokeWidth="1.5" strokeDasharray="3,3" opacity="0.8" />
@@ -954,8 +946,6 @@ const PhoebeCycleTracker: React.FC = () => {
   );
 };
 
-// --- Subcomponents & Styles ---
-
 const RecordDropdown: React.FC<{
   label: string;
   options: string[];
@@ -978,8 +968,6 @@ const RecordDropdown: React.FC<{
     </div>
   </div>
 );
-
-// Style Definitions
 
 const appContainerStyle: React.CSSProperties = {
   maxWidth: '600px',
