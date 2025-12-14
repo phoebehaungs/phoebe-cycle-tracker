@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
 // ==========================================
-// 1. 基礎設定與常數 (最優先定義)
+// 1. 全局配置與樣式 (最優先讀取)
 // ==========================================
 
 const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
@@ -26,208 +26,7 @@ const COLORS = {
   chartBlue: '#7FCCC3',
 };
 
-// --- Helper: 安全讀取 localStorage (防 SSR 白畫面) ---
-const safeGetItem = (key: string) => {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage.getItem(key);
-  } catch (e) {
-    return null;
-  }
-};
-
-const safeJsonParse = <T,>(raw: string | null, fallback: T): T => {
-  if (!raw) return fallback;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed as T;
-  } catch {
-    return fallback;
-  }
-};
-
-// --- 資料定義 ---
-
-type Appetite = '低' | '中' | '高' | '';
-type Mood = '穩定' | '敏感/焦慮' | '低落' | '';
-type Body = '無水腫' | '微水腫' | '水腫明顯' | '';
-type Sleep = '良好' | '普通' | '睡不好' | '';
-type PhaseKey = 'period' | 'follicular' | 'ovulation' | 'luteal' | 'pms';
-
-interface PhaseDefinition {
-  name: string;
-  startDay: number;
-  endDay: number;
-  symptoms: string[];
-  diet: string[];
-  care: string[];
-  tips: string;
-  color: string;
-  lightColor: string;
-  hormone: string;
-  accent: string;
-}
-
-interface CycleRecord {
-  id: string;
-  startDate: string;
-  length: number | null;
-  periodLength?: number;
-}
-
-interface SymptomRecord {
-  date: string;
-  appetite: Appetite;
-  mood: Mood;
-  body: Body;
-  sleep: Sleep;
-  notes: string;
-}
-
-interface DateDetail {
-  date: string;
-  day: number;
-  phase: PhaseDefinition;
-  record: SymptomRecord | undefined;
-}
-
-interface PhaseSupport {
-  key: PhaseKey;
-  explanation: string;
-  todayFocus: string;
-  permission: string;
-  successRule: string;
-}
-
-interface MentalRecord {
-  date: string;
-  anxiety: number;
-  win: string;
-}
-
-// --- 預設資料 (確保不為 undefined) ---
-
-const INITIAL_HISTORY: CycleRecord[] = [
-  { id: '1', startDate: '2025-11-05', length: 34, periodLength: 6 },
-  { id: '2', startDate: '2025-12-10', length: null, periodLength: 6 },
-];
-
-const SYMPTOM_OPTIONS: Record<'appetite' | 'mood' | 'body' | 'sleep', string[]> = {
-  appetite: ['低', '中', '高'],
-  mood: ['穩定', '敏感/焦慮', '低落'],
-  body: ['無水腫', '微水腫', '水腫明顯'],
-  sleep: ['良好', '普通', '睡不好'],
-};
-
-const PHASE_RULES: PhaseDefinition[] = [
-  {
-    name: '生理期',
-    startDay: 1,
-    endDay: 6,
-    symptoms: ['疲倦、想休息', '水腫慢慢消退中', '偶爾子宮悶感'],
-    diet: ['食慾偏低/正常', '想吃冰(荷爾蒙反應)'],
-    care: ['不逼自己運動', '多喝暖身飲', '早餐多一點蛋白質'],
-    tips: '這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。',
-    color: '#B5A0D9',
-    lightColor: '#F2EFF9',
-    hormone: '雌激素與黃體素低點',
-    accent: '#B5A0D9',
-  },
-  {
-    name: '濾泡期 (黃金期)',
-    startDay: 7,
-    endDay: 24,
-    symptoms: ['精力恢復', '身體最輕盈(無水腫)', '心情平穩'],
-    diet: ['食慾最低', '最好控制', '飽足感良好'],
-    care: ['適合減脂/建立習慣', 'Zumba/伸展效果好'],
-    tips: '現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！',
-    color: '#7FCCC3',
-    lightColor: '#EDF7F6',
-    hormone: '雌激素逐漸上升',
-    accent: '#7FCCC3',
-  },
-  {
-    name: '排卵期',
-    startDay: 25,
-    endDay: 27,
-    symptoms: ['下腹悶、體溫升高', '出現微水腫'],
-    diet: ['食慾微增', '有些人想吃甜'],
-    care: ['多喝水、多吃蔬菜', '補充可溶性纖維'],
-    tips: '這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。',
-    color: '#F6D776',
-    lightColor: '#FFFBEB',
-    hormone: '黃體生成素(LH)高峰',
-    accent: '#E0C25E',
-  },
-  {
-    name: '黃體期前段',
-    startDay: 28,
-    endDay: 29,
-    symptoms: ['較容易累', '情緒敏感', '水腫感變明顯'],
-    diet: ['開始嘴饞', '想吃頻率變高'],
-    care: ['早餐加蛋白質', '下午備好安全點心'],
-    tips: '提前兩天準備，比發生後補救更有效。',
-    color: '#7F8CE0',
-    lightColor: '#E8EAF6',
-    hormone: '黃體素開始上升',
-    accent: '#7F8CE0',
-  },
-  {
-    name: 'PMS 高峰',
-    startDay: 30,
-    endDay: 33,
-    symptoms: ['焦慮、情緒緊繃', '嚴重水腫、睡不好', '身心較沒安全感'],
-    diet: ['想吃甜、想吃冰', '正餐後仍想吃'],
-    care: ['補充鎂(減少焦慮)', '允許多吃 5～10%', '熱茶/小毯子/深呼吸'],
-    tips: '這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。',
-    color: '#E07F8C',
-    lightColor: '#FFF0F3',
-    hormone: '黃體素高峰 / 準備下降',
-    accent: '#E07F8C',
-  },
-];
-
-const PHASE_SUPPORT: Record<PhaseKey, PhaseSupport> = {
-  period: {
-    key: 'period',
-    explanation: '今天比較累或想休息，是荷爾蒙低點的正常反應，不代表妳變弱。',
-    todayFocus: '把目標縮小：吃好一餐、睡早一點，其他先放下。',
-    permission: '我允許自己慢下來。',
-    successRule: '今天只要照顧好自己，就是成功。'
-  },
-  follicular: {
-    key: 'follicular',
-    explanation: '今天比較有掌控感，是雌激素上升帶來的自然狀態。',
-    todayFocus: '只做一個小習慣：例如 10 分鐘伸展或備一份安全點心。',
-    permission: '我不用一次做到全部。',
-    successRule: '願意開始、願意維持，就算成功。'
-  },
-  ovulation: {
-    key: 'ovulation',
-    explanation: '今天的波動（悶、腫、敏感）更像荷爾蒙轉換期的反應。',
-    todayFocus: '多喝水 + 不做體重評分，把注意力放回身體感受。',
-    permission: '我允許身體有變化。',
-    successRule: '沒有對自己生氣，就是成功。'
-  },
-  luteal: {
-    key: 'luteal',
-    explanation: '今天更敏感、較疲倦，不是意志力問題，是黃體素影響。',
-    todayFocus: '提前準備安全感：把點心、熱茶、熱敷先放到位。',
-    permission: '我不用撐住一切。',
-    successRule: '穩住節奏、沒有用責備逼自己，就是成功。'
-  },
-  pms: {
-    key: 'pms',
-    explanation: '今天的不安會被放大，是荷爾蒙造成的放大鏡，不代表妳失控。',
-    todayFocus: '先穩住情緒再談飲食：喝水/熱敷/洗澡，先做一件事。',
-    permission: '我允許今天只求不崩潰。',
-    successRule: '沒有失控，就是極大的成功。'
-  }
-};
-
-// ==========================================
-// 2. 樣式定義 (Styles) - 放在元件之前
-// ==========================================
+// --- 樣式定義 (確保全部都在這裡) ---
 
 const appContainerStyle: React.CSSProperties = {
   maxWidth: '600px',
@@ -479,7 +278,7 @@ const todayMarkerStyle = (x: number): React.CSSProperties => ({
 
 const chartDayLabelsStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: COLORS.textGrey, marginTop: '35px', fontFamily: 'Nunito, sans-serif', fontWeight:'500' };
 
-// --- 新增與修改的週期關鍵窗口樣式 ---
+// --- 新增的關鍵日期區塊樣式 ---
 
 const keyDatesCardStyle: React.CSSProperties = {
   marginTop: "25px",
@@ -589,7 +388,7 @@ const tipBoxStyle: React.CSSProperties = {
   marginTop: "8px",
 };
 
-// ------------------------------------
+// ---
 
 const calendarCardStyle: React.CSSProperties = {
   ...baseCardStyle,
@@ -1804,4 +1603,4 @@ const RecordDropdown: React.FC<{
   </div>
 );
 
-export default PhoebeCycleTracker;
+export default App;
