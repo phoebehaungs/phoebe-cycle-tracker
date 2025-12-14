@@ -1206,7 +1206,40 @@ const getCurvePoints = (
   } // ✅ 這個大括號是你原本缺的：關掉 for 迴圈
 
   return points.join(' ');
-}; // ✅ 關掉 getCurvePoints 函式
+
+  // ✅ 把 points 字串轉成平滑曲線 path（Catmull-Rom to Bezier）
+const pointsToSmoothPath = (pointsStr: string) => {
+  const pts = pointsStr
+    .trim()
+    .split(' ')
+    .map(p => p.split(',').map(Number))
+    .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) as [number, number][];
+
+  if (pts.length < 2) return '';
+
+  const d: string[] = [];
+  d.push(`M ${pts[0][0]} ${pts[0][1]}`);
+
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+
+    // Catmull-Rom → Bezier control points
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+
+    d.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`);
+  }
+
+  return d.join(' ');
+};
+
+        
+        }; // ✅ 關掉 getCurvePoints 函式
 
         
   const edemaRiseDay = 25;
@@ -1287,7 +1320,11 @@ const getCurvePoints = (
           </div>
           <div style={{marginBottom: '8px'}}>• {support.explanation}</div>
           <div style={{ marginTop: 12 }}>✅ <b>今天只要做一件事：</b>{support.todayFocus}</div>
-          <div style={{ marginTop: 8 }}>🫶 <b>我允許自己：</b>{support.permission}</div>
+         <div style={{ marginTop: 8 }}>
+  <span style={{ fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif' }}>🫶</span>{' '}
+  <b>我允許自己：</b>{support.permission}
+</div>
+
         </div>
 
         <div style={{ marginTop: 20, padding: '0 5px' }}>
@@ -1407,9 +1444,34 @@ const getCurvePoints = (
             <line x1="0" y1="112.5" x2="340" y2="112.5" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
 
             {/* Data Lines */}
-            <polyline points={getCurvePoints(340, 150, 'appetite')} fill="none" stroke={COLORS.chartOrange} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <polyline points={getCurvePoints(340, 150, 'hormone')} fill="none" stroke={COLORS.chartPurple} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
-            <polyline points={getCurvePoints(340, 150, 'edema')} fill="none" stroke={COLORS.chartBlue} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+<path
+  d={pointsToSmoothPath(getCurvePoints(340, 150, 'appetite'))}
+  fill="none"
+  stroke={COLORS.chartOrange}
+  strokeWidth="3"
+  strokeLinecap="round"
+  strokeLinejoin="round"
+/>
+
+<path
+  d={pointsToSmoothPath(getCurvePoints(340, 150, 'hormone'))}
+  fill="none"
+  stroke={COLORS.chartPurple}
+  strokeWidth="3"
+  strokeLinecap="round"
+  strokeLinejoin="round"
+  opacity="0.6"
+/>
+
+<path
+  d={pointsToSmoothPath(getCurvePoints(340, 150, 'edema'))}
+  fill="none"
+  stroke={COLORS.chartBlue}
+  strokeWidth="3"
+  strokeLinecap="round"
+  strokeLinejoin="round"
+/>
+
 
             {/* Today Marker */}
             <line x1={xForDay(chartDaysPassed, 340)} y1="0" x2={xForDay(chartDaysPassed, 340)} y2="150" stroke={COLORS.textDark} strokeWidth="2" strokeDasharray="4,2" />
