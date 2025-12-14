@@ -70,7 +70,7 @@ const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
 const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
 const MENTAL_STORAGE_KEY = 'phoebeMentalRecords';
 
-// 全新配色方案
+// 全新配色方案 (藍紫 + 蜜桃)
 const COLORS = {
   primary: '#7F8CE0',   // 主藍紫色
   primaryLight: '#E8EAF6',
@@ -637,7 +637,6 @@ const PhoebeCycleTracker: React.FC = () => {
       <header style={headerStyle}>
         <div style={{ width: '20px' }} />
         <div style={headerContentStyle}>
-          {/* Logo Icon - 使用主色調 */}
           <svg width="28" height="28" viewBox="0 0 24 24" fill={COLORS.primary} xmlns="http://www.w3.org/2000/svg">
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
@@ -794,11 +793,11 @@ const PhoebeCycleTracker: React.FC = () => {
           <h4 style={keyDatesTitleStyle}>📅 關鍵預測日期</h4>
           <div style={keyDateItemStyle}>
             <span style={keyDateLabelStyle(COLORS.chartBlue, COLORS.primaryLight)}>💧 水腫與食慾明顯上升</span>
-            <span style={keyDateValueStyle}>{edemaRiseDateStr} (Day 25)</span>
+            <span style={keyDateValueStyle()}>{edemaRiseDateStr} (Day 25)</span>
           </div>
           <div style={keyDateItemStyle}>
             <span style={keyDateLabelStyle(COLORS.chartPurple, COLORS.primaryLight)}>💜 壓力開始明顯上升</span>
-            <span style={keyDateValueStyle}>{stressRiseDateStr} (Day 28)</span>
+            <span style={keyDateValueStyle()}>{stressRiseDateStr} (Day 28)</span>
           </div>
           <div style={keyDateItemStyle}>
             <span style={keyDateLabelStyle(COLORS.accentDark, '#FFF0ED')}>🔥 PMS 全面高峰</span>
@@ -1051,7 +1050,7 @@ const circularChartStyle = (color: string, percent: number): React.CSSProperties
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  boxShadow: `0 8px 20px ${color}33`, // 使用階段顏色作為陰影
+  boxShadow: `0 8px 20px ${color}33`, 
   background: `conic-gradient(${color} ${percent}%, ${COLORS.primaryLight} ${percent}%)`,
   flexShrink: 0,
 });
@@ -1113,7 +1112,7 @@ const careListStyle: React.CSSProperties = {
 const mentalSupportCardStyle = (color: string): React.CSSProperties => ({
   ...baseCardStyle,
   marginTop: '20px',
-  borderTop: `5px solid ${color}`, // 改為頂部邊框
+  borderTop: `5px solid ${color}`, 
 });
 
 const mentalTipBlockStyle = (lightColor: string, color: string): React.CSSProperties => ({
@@ -1138,7 +1137,7 @@ const stabilizeBlockStyle = (accent: string): React.CSSProperties => ({
   padding: '20px',
   borderRadius: '18px',
   border: `2px solid ${accent}`,
-  backgroundColor: '#FFF8F6', // 極淺的蜜桃色背景
+  backgroundColor: '#FFF8F6',
 });
 
 const successRuleBlockStyle: React.CSSProperties = { background: COLORS.primaryLight, padding: '15px', borderRadius: '12px', lineHeight: 1.6, fontSize: '1rem', color: COLORS.textDark, fontWeight:'500' };
@@ -1237,7 +1236,7 @@ const calendarDayStyle = (isCurrentMonth: boolean, isToday: boolean, phase: Phas
     transition: 'all 0.2s ease',
     border: '1px solid transparent',
     ...((!isToday && phase) && { backgroundColor: phase.lightColor, color: COLORS.textDark }),
-    ...(isToday && { backgroundColor: COLORS.primary, color: 'white', boxShadow: `0 4px 10px ${COLORS.primary}66`, border: 'none' }),
+    ...(isToday && { backgroundColor: '#555555', color: 'white', boxShadow: `0 4px 10px rgba(0,0,0,0.2)`, border: 'none' }),
   };
   return base;
 };
@@ -1341,7 +1340,7 @@ const modalOverlayStyle: React.CSSProperties = {
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundColor: 'rgba(51, 51, 68, 0.5)', // 使用深藍灰色半透明
+  backgroundColor: 'rgba(51, 51, 68, 0.5)', 
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
