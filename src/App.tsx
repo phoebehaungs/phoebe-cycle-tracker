@@ -2,90 +2,10 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
 // ==========================================
-// 1. 定義資料結構 (Types)
+// 1. 全局配置與樣式 (最優先讀取，防止白畫面)
 // ==========================================
 
-type Appetite = '低' | '中' | '高' | '';
-type Mood = '穩定' | '敏感/焦慮' | '低落' | '';
-type Body = '無水腫' | '微水腫' | '水腫明顯' | '';
-type Sleep = '良好' | '普通' | '睡不好' | '';
-
-interface PhaseDefinition {
-  name: string;
-  startDay: number;
-  endDay: number;
-  symptoms: string[];
-  diet: string[];
-  care: string[];
-  tips: string;
-  color: string;
-  lightColor: string;
-  hormone: string;
-  accent: string;
-}
-
-interface CycleRecord {
-  id: string;
-  startDate: string; // "YYYY-MM-DD"
-  length: number | null; // 週期長度
-  periodLength?: number; // 生理期出血天數
-}
-
-interface SymptomRecord {
-  date: string;
-  appetite: Appetite;
-  mood: Mood;
-  body: Body;
-  sleep: Sleep;
-  notes: string;
-}
-
-interface DateDetail {
-  date: string;
-  day: number;
-  phase: PhaseDefinition;
-  record: SymptomRecord | undefined;
-}
-
-type PhaseKey = 'period' | 'follicular' | 'ovulation' | 'luteal' | 'pms';
-
-interface PhaseSupport {
-  key: PhaseKey;
-  explanation: string;
-  todayFocus: string;
-  permission: string;
-  successRule: string;
-}
-
-interface MentalRecord {
-  date: string;
-  anxiety: number;
-  win: string;
-}
-
-// ==========================================
-// 2. 靜態資料與常數 (Constants) - 放在最上面防止 ReferenceError
-// ==========================================
-
-const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
-const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
-const MENTAL_STORAGE_KEY = 'phoebeMentalRecords';
-
-// 補回缺失的 INITIAL_HISTORY
-const INITIAL_HISTORY: CycleRecord[] = [
-  { id: '1', startDate: '2025-11-05', length: 34, periodLength: 6 },
-  { id: '2', startDate: '2025-12-10', length: null, periodLength: 6 },
-];
-
-// 補回缺失的 SYMPTOM_OPTIONS
-const SYMPTOM_OPTIONS: Record<'appetite' | 'mood' | 'body' | 'sleep', string[]> = {
-  appetite: ['低', '中', '高'],
-  mood: ['穩定', '敏感/焦慮', '低落'],
-  body: ['無水腫', '微水腫', '水腫明顯'],
-  sleep: ['良好', '普通', '睡不好'],
-};
-
-// 配色方案
+// 配色方案 (藍紫 + 蜜桃)
 const COLORS = {
   primary: '#7F8CE0',   // 主藍紫色
   primaryLight: '#E8EAF6',
@@ -102,115 +22,12 @@ const COLORS = {
   chartBlue: '#7FCCC3',
 };
 
-const PHASE_RULES: PhaseDefinition[] = [
-  {
-    name: '生理期',
-    startDay: 1,
-    endDay: 6,
-    symptoms: ['疲倦、想休息', '水腫慢慢消退中', '偶爾子宮悶感'],
-    diet: ['食慾偏低/正常', '想吃冰(荷爾蒙反應)'],
-    care: ['不逼自己運動', '多喝暖身飲', '早餐多一點蛋白質'],
-    tips: '這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。',
-    color: '#B5A0D9',
-    lightColor: '#F2EFF9',
-    hormone: '雌激素與黃體素低點',
-    accent: '#B5A0D9',
-  },
-  {
-    name: '濾泡期 (黃金期)',
-    startDay: 7,
-    endDay: 24,
-    symptoms: ['精力恢復', '身體最輕盈(無水腫)', '心情平穩'],
-    diet: ['食慾最低', '最好控制', '飽足感良好'],
-    care: ['適合減脂/建立習慣', 'Zumba/伸展效果好'],
-    tips: '現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！',
-    color: '#7FCCC3',
-    lightColor: '#EDF7F6',
-    hormone: '雌激素逐漸上升',
-    accent: '#7FCCC3',
-  },
-  {
-    name: '排卵期',
-    startDay: 25,
-    endDay: 27,
-    symptoms: ['下腹悶、體溫升高', '出現微水腫'],
-    diet: ['食慾微增', '有些人想吃甜'],
-    care: ['多喝水、多吃蔬菜', '補充可溶性纖維'],
-    tips: '這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。',
-    color: '#F6D776',
-    lightColor: '#FFFBEB',
-    hormone: '黃體生成素(LH)高峰',
-    accent: '#E0C25E',
-  },
-  {
-    name: '黃體期前段',
-    startDay: 28,
-    endDay: 29,
-    symptoms: ['較容易累', '情緒敏感', '水腫感變明顯'],
-    diet: ['開始嘴饞', '想吃頻率變高'],
-    care: ['早餐加蛋白質', '下午備好安全點心'],
-    tips: '提前兩天準備，比發生後補救更有效。',
-    color: '#7F8CE0',
-    lightColor: '#E8EAF6',
-    hormone: '黃體素開始上升',
-    accent: '#7F8CE0',
-  },
-  {
-    name: 'PMS 高峰',
-    startDay: 30,
-    endDay: 33,
-    symptoms: ['焦慮、情緒緊繃', '嚴重水腫、睡不好', '身心較沒安全感'],
-    diet: ['想吃甜、想吃冰', '正餐後仍想吃'],
-    care: ['補充鎂(減少焦慮)', '允許多吃 5～10%', '熱茶/小毯子/深呼吸'],
-    tips: '這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。',
-    color: '#E07F8C',
-    lightColor: '#FFF0F3',
-    hormone: '黃體素高峰 / 準備下降',
-    accent: '#E07F8C',
-  },
-];
+// Storage Keys
+const LOCAL_STORAGE_KEY = 'phoebeCycleHistory';
+const SYMPTOM_STORAGE_KEY = 'phoebeSymptomRecords';
+const MENTAL_STORAGE_KEY = 'phoebeMentalRecords';
 
-const PHASE_SUPPORT: Record<PhaseKey, PhaseSupport> = {
-  period: {
-    key: 'period',
-    explanation: '今天比較累或想休息，是荷爾蒙低點的正常反應，不代表妳變弱。',
-    todayFocus: '把目標縮小：吃好一餐、睡早一點，其他先放下。',
-    permission: '我允許自己慢下來。',
-    successRule: '今天只要照顧好自己，就是成功。'
-  },
-  follicular: {
-    key: 'follicular',
-    explanation: '今天比較有掌控感，是雌激素上升帶來的自然狀態。',
-    todayFocus: '只做一個小習慣：例如 10 分鐘伸展或備一份安全點心。',
-    permission: '我不用一次做到全部。',
-    successRule: '願意開始、願意維持，就算成功。'
-  },
-  ovulation: {
-    key: 'ovulation',
-    explanation: '今天的波動（悶、腫、敏感）更像荷爾蒙轉換期的反應。',
-    todayFocus: '多喝水 + 不做體重評分，把注意力放回身體感受。',
-    permission: '我允許身體有變化。',
-    successRule: '沒有對自己生氣，就是成功。'
-  },
-  luteal: {
-    key: 'luteal',
-    explanation: '今天更敏感、較疲倦，不是意志力問題，是黃體素影響。',
-    todayFocus: '提前準備安全感：把點心、熱茶、熱敷先放到位。',
-    permission: '我不用撐住一切。',
-    successRule: '穩住節奏、沒有用責備逼自己，就是成功。'
-  },
-  pms: {
-    key: 'pms',
-    explanation: '今天的不安會被放大，是荷爾蒙造成的放大鏡，不代表妳失控。',
-    todayFocus: '先穩住情緒再談飲食：喝水/熱敷/洗澡，先做一件事。',
-    permission: '我允許今天只求不崩潰。',
-    successRule: '沒有失控，就是極大的成功。'
-  }
-};
-
-// ==========================================
-// 3. 樣式定義 (Styles) - 放在元件之前
-// ==========================================
+// --- 樣式物件與函式 (全部移至頂部) ---
 
 const appContainerStyle: React.CSSProperties = {
   maxWidth: '600px',
@@ -259,6 +76,7 @@ const todayStatusContainerStyle: React.CSSProperties = { display: 'flex', justif
 const todayDateStyle: React.CSSProperties = { fontSize: '2.2rem', fontWeight: '800', color: COLORS.textDark, fontFamily: 'Nunito, sans-serif', lineHeight: 1 };
 const todayLabelStyle: React.CSSProperties = { fontSize: '1rem', color: COLORS.textGrey, fontWeight: '500', marginBottom:'5px', display:'block' };
 
+// 按鈕樣式
 const editCycleButtonStyle: React.CSSProperties = {
   background: COLORS.accent,
   border: 'none',
@@ -331,7 +149,7 @@ const cardTitleStyle = (color: string, noBorder: boolean): React.CSSProperties =
   fontWeight: '800',
 });
 
-// 補上 listListStyle
+// ✅ 這裡補上了 listListStyle
 const listListStyle: React.CSSProperties = {
   paddingLeft: '20px',
   lineHeight: '1.8',
@@ -340,6 +158,7 @@ const listListStyle: React.CSSProperties = {
   fontSize: '1rem',
 };
 
+// 為了兼容性，也加上 careListStyle (兩者其實通用)
 const careListStyle: React.CSSProperties = {
   paddingLeft: '20px',
   lineHeight: '1.8',
@@ -381,6 +200,62 @@ const stabilizeBlockStyle = (accent: string): React.CSSProperties => ({
 
 const successRuleBlockStyle: React.CSSProperties = { background: COLORS.primaryLight, padding: '15px', borderRadius: '12px', lineHeight: 1.6, fontSize: '1rem', color: COLORS.textDark, fontWeight:'500' };
 const winLabelStyle: React.CSSProperties = { display: 'block', fontSize: '1rem', color: COLORS.textDark, marginBottom: 8, fontWeight: 'bold' };
+
+const recentTrendBlockStyle: React.CSSProperties = {
+  marginTop: 18,
+  padding: '16px 18px',
+  borderRadius: '18px',
+  border: `1px solid ${COLORS.border}`,
+  backgroundColor: '#FFFFFF',
+};
+
+const recentTrendHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'baseline',
+  marginBottom: 10,
+};
+
+const sparklineWrapStyle: React.CSSProperties = {
+  width: '100%',
+  height: 70,
+  position: 'relative',
+  borderRadius: 14,
+  backgroundColor: '#F8F9FC',
+  border: `1px dashed ${COLORS.border}`,
+  overflow: 'hidden',
+};
+
+const recentListStyle: React.CSSProperties = {
+  marginTop: 12,
+  display: 'grid',
+  gap: 8,
+};
+
+const recentRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  fontSize: '0.9rem',
+  color: COLORS.textDark,
+};
+
+const recentBarTrackStyle: React.CSSProperties = {
+  flex: 1,
+  height: 8,
+  borderRadius: 999,
+  backgroundColor: COLORS.primaryLight,
+  margin: '0 10px',
+  overflow: 'hidden',
+};
+
+// 修正 recentBarFillStyle 為函式
+const recentBarFillStyle = (percent: number): React.CSSProperties => ({
+  width: `${percent}%`,
+  height: '100%',
+  borderRadius: 999,
+  backgroundColor: COLORS.primary,
+});
 
 const chartCardStyle: React.CSSProperties = {
   ...baseCardStyle,
@@ -666,61 +541,25 @@ const dropdownButtonStyle = (isActive: boolean, accentColor: string): React.CSSP
   boxShadow: isActive ? `0 2px 8px ${accentColor}40` : 'none',
 });
 
-const recentTrendBlockStyle: React.CSSProperties = {
-  marginTop: 18,
-  padding: '16px 18px',
-  borderRadius: '18px',
-  border: `1px solid ${COLORS.border}`,
-  backgroundColor: '#FFFFFF',
+// ==========================================
+// 2. Types (定義) - 其實應該放最上面，這裡註解一下
+// ==========================================
+
+// ==========================================
+// 3. 常數資料 (CONSTANTS) - 確保這些在最前面
+// ==========================================
+
+const INITIAL_HISTORY: CycleRecord[] = [
+  { id: '1', startDate: '2025-11-05', length: 34, periodLength: 6 },
+  { id: '2', startDate: '2025-12-10', length: null, periodLength: 6 },
+];
+
+const SYMPTOM_OPTIONS: Record<'appetite' | 'mood' | 'body' | 'sleep', string[]> = {
+  appetite: ['低', '中', '高'],
+  mood: ['穩定', '敏感/焦慮', '低落'],
+  body: ['無水腫', '微水腫', '水腫明顯'],
+  sleep: ['良好', '普通', '睡不好'],
 };
-
-const recentTrendHeaderStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'baseline',
-  marginBottom: 10,
-};
-
-const sparklineWrapStyle: React.CSSProperties = {
-  width: '100%',
-  height: 70,
-  position: 'relative',
-  borderRadius: 14,
-  backgroundColor: '#F8F9FC',
-  border: `1px dashed ${COLORS.border}`,
-  overflow: 'hidden',
-};
-
-const recentListStyle: React.CSSProperties = {
-  marginTop: 12,
-  display: 'grid',
-  gap: 8,
-};
-
-const recentRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  fontSize: '0.9rem',
-  color: COLORS.textDark,
-};
-
-const recentBarTrackStyle: React.CSSProperties = {
-  flex: 1,
-  height: 8,
-  borderRadius: 999,
-  backgroundColor: COLORS.primaryLight,
-  margin: '0 10px',
-  overflow: 'hidden',
-};
-
-const recentBarFillStyle = (percent: number): React.CSSProperties => ({
-  width: `${percent}%`,
-  height: '100%',
-  borderRadius: 999,
-  backgroundColor: COLORS.primary,
-});
-
 
 // ==========================================
 // 4. Helper 函式 (Helpers)
@@ -937,9 +776,9 @@ const PhoebeCycleTracker: React.FC = () => {
   const support = useMemo(() => PHASE_SUPPORT[phaseKey] || PHASE_SUPPORT.period, [phaseKey]);
   const todayMental = useMemo(() => getMentalForDate(todayStr), [getMentalForDate, todayStr]);
   const showStabilize = todayMental.anxiety >= 7;
-        // 最近 7 天不安指數趨勢
+
+  // 最近 7 天不安指數趨勢
   const recentAnxietySeries = useMemo(() => {
-    // 由舊到新：今天往回 6 天
     const days = Array.from({ length: 7 }, (_, i) => addDays(todayStr, -(6 - i)));
     return days.map(d => {
       const rec = getMentalForDate(d);
@@ -969,7 +808,6 @@ const PhoebeCycleTracker: React.FC = () => {
       })
       .join(' ');
   }, [recentAnxietySeries]);
-
 
   const nextPeriodDate = useMemo(() => addDays(lastStartDate, averageCycleLength), [lastStartDate, averageCycleLength]);
   const nextPMSDate = useMemo(() => addDays(nextPeriodDate, -7), [nextPeriodDate]);
@@ -1137,159 +975,56 @@ const PhoebeCycleTracker: React.FC = () => {
       setEditBleedingDays(currentPeriodLength);
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
-// --- Chart Logic (乾淨版本) ---
 
-const totalDaysForChart = 34;
-const xForDay = (day: number, width: number) =>
-  ((day - 1) / (totalDaysForChart - 1)) * width;
+  // --- Chart Logic ---
 
-// 平滑工具
-const smoothstep = (t: number) => t * t * (3 - 2 * t);
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
-const segment = (day: number, d0: number, d1: number) =>
-  clamp01((day - d0) / (d1 - d0));
+  const totalDaysForChart = 34;
+  const xForDay = (day: number, width: number) => ((day - 1) / (totalDaysForChart - 1)) * width;
 
-// 示意強度（0~100）
-const getIntensity = (
-  day: number,
-  type: 'appetite' | 'stress' | 'edema'
-) => {
-  if (type === 'appetite') {
-    if (day <= 6) return 55;
-    if (day <= 20) return lerp(45, 35, smoothstep(segment(day, 7, 20)));
-    if (day <= 27) return lerp(35, 50, smoothstep(segment(day, 20, 27)));
-    if (day <= 30) return lerp(50, 70, smoothstep(segment(day, 27, 30)));
-    if (day <= 33) return lerp(70, 90, smoothstep(segment(day, 30, 33)));
-    return 85;
-  }
+  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {
+    const points: string[] = [];
+    for (let day = 1; day <= totalDaysForChart; day++) {
+      let intensity = 50;
 
-  if (type === 'edema') {
-    if (day <= 6) return lerp(65, 45, smoothstep(segment(day, 1, 6)));
-    if (day <= 20) return lerp(45, 30, smoothstep(segment(day, 7, 20)));
-    if (day <= 29) return lerp(30, 60, smoothstep(segment(day, 20, 29)));
-    if (day <= 33) return lerp(60, 85, smoothstep(segment(day, 29, 33)));
-    return 80;
-  }
+      if (type === 'appetite') {
+        if (day <= 6) intensity = 62;
+        else if (day <= 24) intensity = 92;
+        else if (day <= 27) intensity = 52;
+        else if (day <= 29) intensity = 42;
+        else intensity = 12;
+      } else if (type === 'hormone') {
+        if (day <= 14) intensity = 80;
+        else if (day <= 24) intensity = 40;
+        else if (day <= 28) intensity = 20;
+        else intensity = 85;
+      } else if (type === 'edema') {
+        if (day <= 3) intensity = 38;
+        else if (day <= 6) intensity = 68;
+        else if (day <= 24) intensity = 93;
+        else if (day <= 27) intensity = 58;
+        else if (day <= 29) intensity = 38;
+        else intensity = 8;
+      }
 
-  // stress
-  if (day <= 10) return lerp(45, 35, smoothstep(segment(day, 1, 10)));
-  if (day <= 24) return lerp(35, 40, smoothstep(segment(day, 10, 24)));
-  if (day <= 29) return lerp(40, 60, smoothstep(segment(day, 24, 29)));
-  if (day <= 33) return lerp(60, 90, smoothstep(segment(day, 29, 33)));
-  return 85;
-};
-
-const getCurvePoints = (
-  width: number,
-  height: number,
-  type: 'appetite' | 'stress' | 'edema'
-) => {
-  const points: string[] = [];
-  for (let day = 1; day <= totalDaysForChart; day++) {
-    const intensity = getIntensity(day, type);
-    const x = xForDay(day, width);
-    const y = height - (intensity / 100) * height;
-    points.push(`${x},${y}`);
-  }
-  return points.join(' ');
-};
-
-  
-  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
-// --- Anxiety overlay (用 mentalRecords 的 anxiety 疊線) ---
-const chartWidth = 340;
-const chartHeight = 150;
-
-// 把 0~10 映射到 0~100 的 intensity（越高越靠上）
-const anxietyToIntensity = (a: number) => clamp(a, 0, 10) * 10;
-
-// 產生多段 polyline points（避免中間沒填資料時拉出怪線）
-const buildAnxietySegments = () => {
-  const segments: string[] = [];
-  let current: string[] = [];
-
-  for (let day = 1; day <= totalDaysForChart; day++) {
-    const dateStr = addDays(lastStartDate, day - 1);
-    const found = mentalRecords.find(r => r.date === dateStr);
-    const hasValue = found && typeof found.anxiety === 'number';
-
-    if (!hasValue) {
-      if (current.length >= 2) segments.push(current.join(' '));
-      current = [];
-      continue;
+      const x = xForDay(day, width);
+      const y = height - (intensity / 100) * height;
+      points.push(`${x},${y}`);
     }
-
-    const intensity = anxietyToIntensity(found.anxiety);
-    const x = xForDay(day, chartWidth);
-    const y = chartHeight - (intensity / 100) * chartHeight;
-    current.push(`${x},${y}`);
-  }
-
-  if (current.length >= 2) segments.push(current.join(' '));
-  return segments;
-};
-
-const anxietySegments = useMemo(() => buildAnxietySegments(), [mentalRecords, lastStartDate]);
-
-  const getCycleDayForDateStr = useCallback(
-  (dateStr: string) => {
-    const idx = findCycleIndexForDate(history, dateStr);
-    if (idx === -1) return null;
-    const cycleStart = history[idx].startDate;
-    const day = getDaysDifference(cycleStart, dateStr) + 1;
-    if (day <= 0) return null;
-    return day;
-  },
-  [history]
-);
-
-const anxietySegments2 = useMemo(() => {
-  // 收集 Day 1~34 每一天對應的 (x,y)，沒資料就用 null
-  const byDay: Array<{ x: number; y: number } | null> = Array.from(
-    { length: totalDaysForChart },
-    () => null
-  );
-
-  // 只處理有效範圍內的紀錄
-  for (const r of mentalRecords) {
-    if (!r || !isValidYMD(r.date)) continue;
-    const day = getCycleDayForDateStr(r.date);
-    if (!day) continue;
-    if (day < 1 || day > totalDaysForChart) continue;
-
-    // anxiety: 0~10 -> intensity: 0~100
-    const intensity = (Number(r.anxiety) / 10) * 100;
-    const x = xForDay(day, 340);
-    const y = 150 - (intensity / 100) * 150; // ⚠️ 這裡的 150 要跟你 SVG height 一致
-    byDay[day - 1] = { x, y };
-  }
-
-  // 把連續有資料的點串成 polyline points 字串，多段輸出
-  const segments: string[] = [];
-  let current: string[] = [];
-
-  const pushCurrentIfValid = () => {
-    // 至少 2 點才畫線（1 點畫出來像一個點，可能你不想要）
-    if (current.length >= 2) segments.push(current.join(' '));
-    current = [];
+    return points.join(' ');
   };
 
-  for (let i = 0; i < byDay.length; i++) {
-    const p = byDay[i];
-    if (!p) {
-      pushCurrentIfValid();
-      continue;
-    }
-    current.push(`${p.x},${p.y}`);
-  }
-  pushCurrentIfValid();
+  const edemaRiseDay = 25;
+  const stressRiseDay = 28;
+  const pmsPeakDay = 30;
 
-  return segments;
-}, [mentalRecords, getCycleDayForDateStr]);
+  const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
+  const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
+  const pmsPeakDateStr = formatShortDate(addDays(lastStartDate, pmsPeakDay - 1));
 
+  const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
 
-    
+  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+
   // --- Render ---
 
   return (
@@ -1375,6 +1110,7 @@ const anxietySegments2 = useMemo(() => {
             }
             style={rangeInputStyle}
           />
+
           {/* 最近 7 天不安指數趨勢 */}
           <div style={recentTrendBlockStyle}>
             <div style={recentTrendHeaderStyle}>
@@ -1464,7 +1200,6 @@ const anxietySegments2 = useMemo(() => {
             <span style={{ color: COLORS.chartOrange, fontWeight:'bold' }}>● 食慾</span>
             <span style={{ color: COLORS.chartPurple, fontWeight:'bold' }}>● 壓力</span>
             <span style={{ color: COLORS.chartBlue, fontWeight:'bold' }}>● 水腫</span>
-            <span style={{ color: COLORS.textDark, fontWeight: 'bold' }}>● 不安</span>
           </div>
         </div>
 
@@ -1477,22 +1212,9 @@ const anxietySegments2 = useMemo(() => {
 
             {/* Data Lines */}
             <polyline points={getCurvePoints(340, 150, 'appetite')} fill="none" stroke={COLORS.chartOrange} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <polyline points={getCurvePoints(340, 150, 'stress')} fill="none" stroke={COLORS.chartPurple} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
+            <polyline points={getCurvePoints(340, 150, 'hormone')} fill="none" stroke={COLORS.chartPurple} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
             <polyline points={getCurvePoints(340, 150, 'edema')} fill="none" stroke={COLORS.chartBlue} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
-            {/* Anxiety (real data) overlay */}
-{anxietySegments2.map((pts, idx) => (
-  <polyline
-    key={idx}
-    points={pts}
-    fill="none"
-    stroke={COLORS.textDark}
-    strokeWidth="3.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    opacity="0.9"
-  />
-))}
             {/* Today Marker */}
             <line x1={xForDay(chartDaysPassed, 340)} y1="0" x2={xForDay(chartDaysPassed, 340)} y2="150" stroke={COLORS.textDark} strokeWidth="2" strokeDasharray="4,2" />
 
