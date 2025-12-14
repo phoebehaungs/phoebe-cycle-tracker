@@ -1,3 +1,9 @@
+'use client';
+// @ts-nocheck
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+
+const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+
 // @ts-nocheck
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
