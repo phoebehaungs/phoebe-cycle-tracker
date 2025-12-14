@@ -1472,118 +1472,125 @@ const PhoebeCycleTracker: React.FC = () => {
             <line x1="0" y1="112.5" x2="340" y2="112.5" stroke={COLORS.border} strokeWidth="1" strokeDasharray="4,4"/>
 
             {/* Data Lines */}
-<path
-  d={pointsToSmoothPath(getCurvePoints(340, 150, 'appetite'))}
-  fill="none"
-  stroke={COLORS.chartOrange}
-  strokeWidth="3"
-  strokeLinecap="round"
-  strokeLinejoin="round"
-/>
+            <path
+              d={pointsToSmoothPath(getCurvePoints(340, 150, 'appetite'))}
+              fill="none"
+              stroke={COLORS.chartOrange}
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
 
-<path
-  d={pointsToSmoothPath(getCurvePoints(340, 150, 'hormone'))}
-  fill="none"
-  stroke={COLORS.chartPurple}
-  strokeWidth="3"
-  strokeLinecap="round"
-  strokeLinejoin="round"
-  opacity="0.6"
-/>
+            <path
+              d={pointsToSmoothPath(getCurvePoints(340, 150, 'hormone'))}
+              fill="none"
+              stroke={COLORS.chartPurple}
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.6"
+            />
 
-<path
-  d={pointsToSmoothPath(getCurvePoints(340, 150, 'edema'))}
-  fill="none"
-  stroke={COLORS.chartBlue}
-  strokeWidth="3"
-  strokeLinecap="round"
-  strokeLinejoin="round"
-/>
-
+            <path
+              d={pointsToSmoothPath(getCurvePoints(340, 150, 'edema'))}
+              fill="none"
+              stroke={COLORS.chartBlue}
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
 
             {/* Today Marker */}
-            <line x1={xForDay(chartDaysPassed, 340)} y1="0" x2={xForDay(chartDaysPassed, 340)} y2="150" stroke={COLORS.textDark} strokeWidth="2" strokeDasharray="4,2" />
+            <line
+              x1={xForDay(chartDaysPassed, 340)}
+              y1="0"
+              x2={xForDay(chartDaysPassed, 340)}
+              y2="150"
+              stroke={COLORS.textDark}
+              strokeWidth="2"
+              strokeDasharray="4,2"
+            />
 
-{/* Critical Events */}
-<line
-  x1={xForDay(ovulationStartDay, 340)}
-  y1="0"
-  x2={xForDay(ovulationStartDay, 340)}
-  y2="150"
-  stroke={COLORS.chartBlue}
-  strokeWidth="1.5"
-  strokeDasharray="3,3"
-  opacity="0.5"
-/>
+            {/* Critical Events */}
+            <line
+              x1={xForDay(ovulationStartDay, 340)}
+              y1="0"
+              x2={xForDay(ovulationStartDay, 340)}
+              y2="150"
+              stroke={COLORS.chartBlue}
+              strokeWidth="1.5"
+              strokeDasharray="3,3"
+              opacity="0.5"
+            />
 
-<line
-  x1={xForDay(lutealStartDay, 340)}
-  y1="0"
-  x2={xForDay(lutealStartDay, 340)}
-  y2="150"
-  stroke={COLORS.chartPurple}
-  strokeWidth="1.5"
-  strokeDasharray="3,3"
-  opacity="0.5"
-/>
+            <line
+              x1={xForDay(lutealStartDay, 340)}
+              y1="0"
+              x2={xForDay(lutealStartDay, 340)}
+              y2="150"
+              stroke={COLORS.chartPurple}
+              strokeWidth="1.5"
+              strokeDasharray="3,3"
+              opacity="0.5"
+            />
 
-<line
-  x1={xForDay(pmsStartDay, 340)}
-  y1="0"
-  x2={xForDay(pmsStartDay, 340)}
-  y2="150"
-  stroke={COLORS.accent}
-  strokeWidth="1.5"
-  strokeDasharray="3,3"
-  opacity="0.8"
-/>
-
+            <line
+              x1={xForDay(pmsStartDay, 340)}
+              y1="0"
+              x2={xForDay(pmsStartDay, 340)}
+              y2="150"
+              stroke={COLORS.accent}
+              strokeWidth="1.5"
+              strokeDasharray="3,3"
+              opacity="0.8"
+            />
           </svg>
 
           <div style={todayMarkerStyle(xForDay(chartDaysPassed, 340))}>今天</div>
         </div>
 
-<div style={chartDayLabelsStyle}>
-  <span>Day 1</span>
-  <span>排卵 (Day {ovulationCenterDay})</span>
-  <span>PMS (Day {pmsStartDay})</span>
-  <span>Day {totalDaysForChart}</span>
-</div>
+        <div style={chartDayLabelsStyle}>
+          <span>Day 1</span>
+          <span>排卵 (Day {ovulationCenterDay})</span>
+          <span>PMS (Day {pmsStartDay})</span>
+          <span>Day {totalDaysForChart}</span>
+        </div>
 
-<div style={keyDatesCardStyle}>
-  <h4 style={keyDatesTitleStyle}>📅 週期關鍵窗口（提醒你準備，不是用來責備自己）</h4>
+        <div style={keyDatesCardStyle}>
+          <h4 style={keyDatesTitleStyle}>📅 週期關鍵窗口（提醒你準備，不是用來責備自己）</h4>
 
-  <div style={keyDateItemStyle}>
-    <span style={keyDateLabelStyle(COLORS.chartBlue, COLORS.primaryLight)}>🥚 排卵窗口（可能的 3 天）</span>
-    <span style={keyDateValueStyle()}>
-      {formatShortDate(addDays(lastStartDate, ovulationStartDay - 1))} ～ {formatShortDate(addDays(lastStartDate, ovulationEndDay - 1))}
-      {' '} (Day {ovulationStartDay}–{ovulationEndDay})
-    </span>
-  </div>
-  <div style={{ marginTop: -6, marginBottom: 12, fontSize: '0.88rem', color: COLORS.textGrey, lineHeight: 1.5 }}>
-    小提醒：這幾天如果覺得悶、腫、敏感，是「轉換期」常見反應，不用硬撐。
-  </div>
+          <div style={keyDateItemStyle}>
+            <span style={keyDateLabelStyle(COLORS.chartBlue, COLORS.primaryLight)}>🥚 排卵窗口（可能的 3 天）</span>
+            <span style={keyDateValueStyle()}>
+              {formatShortDate(addDays(lastStartDate, ovulationStartDay - 1))} ～ {formatShortDate(addDays(lastStartDate, ovulationEndDay - 1))}
+              {' '} (Day {ovulationStartDay}–{ovulationEndDay})
+            </span>
+          </div>
+          <div style={{ marginTop: -6, marginBottom: 12, fontSize: '0.88rem', color: COLORS.textGrey, lineHeight: 1.5 }}>
+            小提醒：這幾天如果覺得悶、腫、敏感，是「轉換期」常見反應，不用硬撐。
+          </div>
 
-  <div style={keyDateItemStyle}>
-    <span style={keyDateLabelStyle(COLORS.chartPurple, COLORS.primaryLight)}>🌙 黃體期開始（身體可能變敏感）</span>
-    <span style={keyDateValueStyle()}>
-      {formatShortDate(addDays(lastStartDate, lutealStartDay - 1))} (Day {lutealStartDay})
-    </span>
-  </div>
-  <div style={{ marginTop: -6, marginBottom: 12, fontSize: '0.88rem', color: COLORS.textGrey, lineHeight: 1.5 }}>
-    小提醒：先把「安全點心 / 熱茶 / 鎂 / 早睡」準備好，會比事後補救輕鬆很多。
-  </div>
+          <div style={keyDateItemStyle}>
+            <span style={keyDateLabelStyle(COLORS.chartPurple, COLORS.primaryLight)}>🌙 黃體期開始（身體可能變敏感）</span>
+            <span style={keyDateValueStyle()}>
+              {formatShortDate(addDays(lastStartDate, lutealStartDay - 1))} (Day {lutealStartDay})
+            </span>
+          </div>
+          <div style={{ marginTop: -6, marginBottom: 12, fontSize: '0.88rem', color: COLORS.textGrey, lineHeight: 1.5 }}>
+            小提醒：先把「安全點心 / 熱茶 / 鎂 / 早睡」準備好，會比事後補救輕鬆很多。
+          </div>
 
-  <div style={keyDateItemStyle}>
-    <span style={keyDateLabelStyle(COLORS.accentDark, '#FFF0ED')}>🔥 PMS 可能開始（先準備安全感）</span>
-    <span style={keyDateValueStyle(COLORS.accentDark)}>
-      {formatShortDate(addDays(lastStartDate, pmsStartDay - 1))} (Day {pmsStartDay})
-    </span>
-  </div>
-  <div style={{ marginTop: -6, marginBottom: 0, fontSize: '0.88rem', color: COLORS.textGrey, lineHeight: 1.5 }}>
-    小提醒：把成功標準改成「穩住就好」——沒有失控，就是很大的成功。
-  </div>
-</div>
+          <div style={keyDateItemStyle}>
+            <span style={keyDateLabelStyle(COLORS.accentDark, '#FFF0ED')}>🔥 PMS 可能開始（先準備安全感）</span>
+            <span style={keyDateValueStyle(COLORS.accentDark)}>
+              {formatShortDate(addDays(lastStartDate, pmsStartDay - 1))} (Day {pmsStartDay})
+            </span>
+          </div>
+          <div style={{ marginTop: -6, marginBottom: 0, fontSize: '0.88rem', color: COLORS.textGrey, lineHeight: 1.5 }}>
+            小提醒：把成功標準改成「穩住就好」——沒有失控，就是很大的成功。
+          </div>
+        </div>
+      </div> {/* ✅ 這行是關閉 chartCardStyle 的外層 div */}
 
 
 
