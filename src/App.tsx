@@ -1203,9 +1203,11 @@ const getCurvePoints = (
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 
     points.push(`${x},${y}`);
+  } // ✅ 這個大括號是你原本缺的：關掉 for 迴圈
 
-return points.join(' ');
-};
+  return points.join(' ');
+}; // ✅ 關掉 getCurvePoints 函式
+
         
   const edemaRiseDay = 25;
   const stressRiseDay = 28;
