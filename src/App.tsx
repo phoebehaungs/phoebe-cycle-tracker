@@ -1137,66 +1137,42 @@ const PhoebeCycleTracker: React.FC = () => {
       setEditBleedingDays(currentPeriodLength);
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
-
-  // --- Chart Logic ---
-
-  const totalDaysForChart = 34;
-  const xForDay = (day: number, width: number) => ((day - 1) / (totalDaysForChart - 1)) * width;
-
-  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {// --- Chart Logic (改成平滑曲線版本) ---
+// --- Chart Logic (乾淨版本) ---
 
 const totalDaysForChart = 34;
-const xForDay = (day: number, width: number) => ((day - 1) / (totalDaysForChart - 1)) * width;
+const xForDay = (day: number, width: number) =>
+  ((day - 1) / (totalDaysForChart - 1)) * width;
 
-// 0~1 的平滑插值（比線性更像「慢慢上來/慢慢下去」）
+// 平滑工具
 const smoothstep = (t: number) => t * t * (3 - 2 * t);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
-const segment = (day: number, d0: number, d1: number) => clamp01((day - d0) / (d1 - d0));
+const segment = (day: number, d0: number, d1: number) =>
+  clamp01((day - d0) / (d1 - d0));
 
-// 方案A：更貼近體感的「示意曲線」：濾泡期低、黃體後段才尖峰
-const getIntensity = (day: number, type: 'appetite' | 'stress' | 'edema') => {
-  // 回傳 0~100（越高代表越強烈；你畫圖是 intensity 高 -> y 越小 -> 越靠上）
+// 示意強度（0~100）
+const getIntensity = (
+  day: number,
+  type: 'appetite' | 'stress' | 'edema'
+) => {
   if (type === 'appetite') {
-    // 生理期：中等（有人會偏想吃/或偏沒食慾，先給中間）
     if (day <= 6) return 55;
-
-    // 濾泡期：最低 & 最好控制（Day 7~20）
     if (day <= 20) return lerp(45, 35, smoothstep(segment(day, 7, 20)));
-
-    // 排卵附近：微升（20~27）
     if (day <= 27) return lerp(35, 50, smoothstep(segment(day, 20, 27)));
-
-    // 黃體期：慢慢嘴饞上來（27~30）
     if (day <= 30) return lerp(50, 70, smoothstep(segment(day, 27, 30)));
-
-    // PMS：短而尖的高峰（30~33）
     if (day <= 33) return lerp(70, 90, smoothstep(segment(day, 30, 33)));
-
-    // 週期尾端：準備來月經前維持高、或略回落（33~34）
     return 85;
   }
 
   if (type === 'edema') {
-    // 生理期：前段偏水腫、後段退（1~6）
     if (day <= 6) return lerp(65, 45, smoothstep(segment(day, 1, 6)));
-
-    // 濾泡期：最低（7~20）
     if (day <= 20) return lerp(45, 30, smoothstep(segment(day, 7, 20)));
-
-    // 排卵後開始慢慢存水（20~29）
     if (day <= 29) return lerp(30, 60, smoothstep(segment(day, 20, 29)));
-
-    // PMS：最高（29~33）
     if (day <= 33) return lerp(60, 85, smoothstep(segment(day, 29, 33)));
-
-    // 週期尾端：維持高
     return 80;
   }
 
-  // type === 'stress'
-  // 這條線用來代表「壓力/不安的易感性（示意）」：黃體期開始拉升，PMS最明顯
+  // stress
   if (day <= 10) return lerp(45, 35, smoothstep(segment(day, 1, 10)));
   if (day <= 24) return lerp(35, 40, smoothstep(segment(day, 10, 24)));
   if (day <= 29) return lerp(40, 60, smoothstep(segment(day, 24, 29)));
@@ -1204,7 +1180,11 @@ const getIntensity = (day: number, type: 'appetite' | 'stress' | 'edema') => {
   return 85;
 };
 
-const getCurvePoints = (width: number, height: number, type: 'appetite' | 'stress' | 'edema') => {
+const getCurvePoints = (
+  width: number,
+  height: number,
+  type: 'appetite' | 'stress' | 'edema'
+) => {
   const points: string[] = [];
   for (let day = 1; day <= totalDaysForChart; day++) {
     const intensity = getIntensity(day, type);
@@ -1214,18 +1194,8 @@ const getCurvePoints = (width: number, height: number, type: 'appetite' | 'stres
   }
   return points.join(' ');
 };
-};
 
-  const edemaRiseDay = 25;
-  const stressRiseDay = 28;
-  const pmsPeakDay = 30;
-
-  const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
-  const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
-  const pmsPeakDateStr = formatShortDate(addDays(lastStartDate, pmsPeakDay - 1));
-
-  const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
-
+  
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
 // --- Anxiety overlay (用 mentalRecords 的 anxiety 疊線) ---
 const chartWidth = 340;
