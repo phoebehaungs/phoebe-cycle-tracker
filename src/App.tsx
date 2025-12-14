@@ -1204,7 +1204,9 @@ const getCurvePoints = (
 
     points.push(`${x},${y}`);
 
-
+return points.join(' ');
+};
+        
   const edemaRiseDay = 25;
   const stressRiseDay = 28;
   const pmsPeakDay = 30;
