@@ -666,6 +666,62 @@ const dropdownButtonStyle = (isActive: boolean, accentColor: string): React.CSSP
   boxShadow: isActive ? `0 2px 8px ${accentColor}40` : 'none',
 });
 
+const recentTrendBlockStyle: React.CSSProperties = {
+  marginTop: 18,
+  padding: '16px 18px',
+  borderRadius: '18px',
+  border: `1px solid ${COLORS.border}`,
+  backgroundColor: '#FFFFFF',
+};
+
+const recentTrendHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'baseline',
+  marginBottom: 10,
+};
+
+const sparklineWrapStyle: React.CSSProperties = {
+  width: '100%',
+  height: 70,
+  position: 'relative',
+  borderRadius: 14,
+  backgroundColor: '#F8F9FC',
+  border: `1px dashed ${COLORS.border}`,
+  overflow: 'hidden',
+};
+
+const recentListStyle: React.CSSProperties = {
+  marginTop: 12,
+  display: 'grid',
+  gap: 8,
+};
+
+const recentRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  fontSize: '0.9rem',
+  color: COLORS.textDark,
+};
+
+const recentBarTrackStyle: React.CSSProperties = {
+  flex: 1,
+  height: 8,
+  borderRadius: 999,
+  backgroundColor: COLORS.primaryLight,
+  margin: '0 10px',
+  overflow: 'hidden',
+};
+
+const recentBarFillStyle = (percent: number): React.CSSProperties => ({
+  width: `${percent}%`,
+  height: '100%',
+  borderRadius: 999,
+  backgroundColor: COLORS.primary,
+});
+
+
 // ==========================================
 // 4. Helper 函式 (Helpers)
 // ==========================================
@@ -881,6 +937,39 @@ const PhoebeCycleTracker: React.FC = () => {
   const support = useMemo(() => PHASE_SUPPORT[phaseKey] || PHASE_SUPPORT.period, [phaseKey]);
   const todayMental = useMemo(() => getMentalForDate(todayStr), [getMentalForDate, todayStr]);
   const showStabilize = todayMental.anxiety >= 7;
+        // 最近 7 天不安指數趨勢
+  const recentAnxietySeries = useMemo(() => {
+    // 由舊到新：今天往回 6 天
+    const days = Array.from({ length: 7 }, (_, i) => addDays(todayStr, -(6 - i)));
+    return days.map(d => {
+      const rec = getMentalForDate(d);
+      return { date: d, anxiety: clamp(Number(rec.anxiety) || 0, 0, 10) };
+    });
+  }, [todayStr, getMentalForDate]);
+
+  const recentAvg = useMemo(() => {
+    const sum = recentAnxietySeries.reduce((s, x) => s + x.anxiety, 0);
+    return Math.round((sum / recentAnxietySeries.length) * 10) / 10;
+  }, [recentAnxietySeries]);
+
+  const sparkPoints = useMemo(() => {
+    const w = 320;
+    const h = 70;
+    const padX = 10;
+    const padY = 10;
+    const usableW = w - padX * 2;
+    const usableH = h - padY * 2;
+
+    return recentAnxietySeries
+      .map((p, idx) => {
+        const x = padX + (idx / (recentAnxietySeries.length - 1)) * usableW;
+        // anxiety 0~10，0 在下、10 在上
+        const y = padY + ((10 - p.anxiety) / 10) * usableH;
+        return `${x},${y}`;
+      })
+      .join(' ');
+  }, [recentAnxietySeries]);
+
 
   const nextPeriodDate = useMemo(() => addDays(lastStartDate, averageCycleLength), [lastStartDate, averageCycleLength]);
   const nextPMSDate = useMemo(() => addDays(nextPeriodDate, -7), [nextPeriodDate]);
@@ -1183,6 +1272,55 @@ const PhoebeCycleTracker: React.FC = () => {
             }
             style={rangeInputStyle}
           />
+          {/* 最近 7 天不安指數趨勢 */}
+          <div style={recentTrendBlockStyle}>
+            <div style={recentTrendHeaderStyle}>
+              <div style={{ fontWeight: 'bold', color: COLORS.textDark }}>📈 最近 7 天不安指數趨勢</div>
+              <div style={{ fontFamily: 'Nunito, sans-serif', color: COLORS.textGrey, fontWeight: 700 }}>
+                平均 {recentAvg}
+              </div>
+            </div>
+
+            <div style={sparklineWrapStyle}>
+              <svg viewBox="0 0 320 70" style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
+                {/* 基準線 */}
+                <line x1="0" y1="35" x2="320" y2="35" stroke={COLORS.border} strokeWidth="1" opacity="0.8" />
+                {/* 趨勢線 */}
+                <polyline
+                  points={sparkPoints}
+                  fill="none"
+                  stroke={COLORS.primary}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {/* 點點 */}
+                {recentAnxietySeries.map((p, idx) => {
+                  const x = 10 + (idx / (recentAnxietySeries.length - 1)) * (320 - 20);
+                  const y = 10 + ((10 - p.anxiety) / 10) * (70 - 20);
+                  return <circle key={p.date} cx={x} cy={y} r="4" fill={COLORS.accent} />;
+                })}
+              </svg>
+            </div>
+
+            <div style={recentListStyle}>
+              {recentAnxietySeries.map(p => (
+                <div key={p.date} style={recentRowStyle}>
+                  <span style={{ width: 54, fontFamily: 'Nunito, sans-serif', color: COLORS.textGrey, fontWeight: 700 }}>
+                    {formatShortDate(p.date)}
+                  </span>
+
+                  <div style={recentBarTrackStyle}>
+                    <div style={recentBarFillStyle((p.anxiety / 10) * 100)} />
+                  </div>
+
+                  <span style={{ width: 28, textAlign: 'right', fontFamily: 'Nunito, sans-serif', fontWeight: 800 }}>
+                    {p.anxiety}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {showStabilize && (
             <div style={stabilizeBlockStyle(COLORS.accent)}>
