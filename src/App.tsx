@@ -1146,51 +1146,57 @@ const PhoebeCycleTracker: React.FC = () => {
     }
   }, [editMode, lastStartDate, currentPeriodLength]);
 
-   // --- Chart Logic ---
+  // --- Chart Logic ---
 
-  // 1) 讓圖表天數跟著你的平均週期走
-  const totalDaysForChart = averageCycleLength;
+  // 0) 讓圖表天數跟著平均週期走（並加上保護範圍）
+  const totalDaysForChart = clamp(averageCycleLength, 21, 60);
 
   const xForDay = (day: number, width: number) =>
-    ((day - 1) / (totalDaysForChart - 1)) * width;
+    totalDaysForChart <= 1 ? 0 : ((day - 1) / (totalDaysForChart - 1)) * width;
 
   const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
 
-  // 2) 用「黃體期約 14 天」推估排卵期位置（排卵 ≈ 下次月經前 14 天）
-  //    排卵窗口抓 3 天（你可改 2～4 天）
+  // 1) 用「黃體期約 14 天」推估排卵期位置（排卵 ≈ 下次月經前 14 天）
+  //    你可把 14 改成 13~15（看你想更貼近自己）
+  const LUTEAL_APPROX_DAYS = 14;
+
+  // 生理期結束日（以你設定的出血天數推估）
   const periodEndDay = clamp(currentPeriodLength, 3, 10);
 
+  // 排卵中心日：週期尾端往前推 14 天
+  // 並避免排卵日太靠近生理期或太靠近尾端
   const ovulationCenterDay = clamp(
-    totalDaysForChart - 14,
-    periodEndDay + 6,          // 避免太靠近生理期
-    totalDaysForChart - 10     // 避免太靠近結尾
+    totalDaysForChart - LUTEAL_APPROX_DAYS,
+    periodEndDay + 6,        // 至少離生理期結束後一小段距離
+    totalDaysForChart - 10   // 至少離週期結尾一段距離
   );
 
-  const ovulationStartDay = clamp(ovulationCenterDay - 1, 1, totalDaysForChart);
-  const ovulationEndDay = clamp(ovulationCenterDay + 1, 1, totalDaysForChart);
+  // 排卵窗口抓 3 天（你可以改 2~4 天）
+  const OVULATION_WINDOW = 3;
+  const halfWindow = Math.floor(OVULATION_WINDOW / 2);
 
-  // 3) PMS 起點：下次生理期前 7 天（你可以改成 5 / 6 / 8 / 10）
+  const ovulationStartDay = clamp(ovulationCenterDay - halfWindow, 1, totalDaysForChart);
+  const ovulationEndDay = clamp(ovulationCenterDay + halfWindow, 1, totalDaysForChart);
+
+  // 2) PMS 起點：下次生理期前 N 天（你可改 5/6/8/10）
   const pmsWindowDays = 7;
   const pmsStartDay = clamp(totalDaysForChart - pmsWindowDays + 1, 1, totalDaysForChart);
   const pmsEndDay = totalDaysForChart;
 
-  // 4) 黃體期：排卵後到 PMS 前
+  // 3) 黃體期：排卵後到 PMS 前
   const lutealStartDay = clamp(ovulationEndDay + 1, 1, totalDaysForChart);
   const lutealEndDay = clamp(pmsStartDay - 1, 1, totalDaysForChart);
 
-  // 5) 你的三條「關鍵事件」垂直線，也跟著週期移動
-  //    水腫/食慾開始上升：排卵附近
-  const edemaRiseDay = ovulationStartDay;
-  //    壓力開始上升：黃體期開始
-  const stressRiseDay = lutealStartDay;
-  //    高峰：PMS 開始（也可以改成 pmsStartDay + 1 更像「進入後才爆」）
-  const pmsPeakDay = pmsStartDay;
+  // 4) 三條「關鍵事件」垂直線：跟著週期移動
+  const edemaRiseDay = ovulationStartDay;   // 水腫/食慾開始上升：排卵附近
+  const stressRiseDay = lutealStartDay;     // 壓力開始上升：黃體期開始
+  const pmsPeakDay = pmsStartDay;           // 高峰：PMS 開始（想更像進入後才爆可改 pmsStartDay + 1）
 
   const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
   const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
   const pmsPeakDateStr = formatShortDate(addDays(lastStartDate, pmsPeakDay - 1));
 
-  // 6) 小工具：線性漸變，讓曲線更像「慢慢上來」
+  // 5) 小工具：線性漸變，讓曲線更像「慢慢上來」
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
   const ramp = (day: number, startDay: number, endDay: number, startV: number, endV: number) => {
     if (endDay <= startDay) return endV;
@@ -1198,7 +1204,7 @@ const PhoebeCycleTracker: React.FC = () => {
     return lerp(startV, endV, t);
   };
 
-  // 7) 點 → 平滑曲線 path（你已經用過的 Catmull-Rom → Bezier）
+  // 6) 點 → 平滑曲線 path（Catmull-Rom → Bezier）
   const pointsToSmoothPath = (pointsStr: string) => {
     const pts = pointsStr
       .trim()
@@ -1228,7 +1234,7 @@ const PhoebeCycleTracker: React.FC = () => {
     return d.join(' ');
   };
 
-  // 8) 依照動態階段計算「更貼近現實」的三條曲線
+  // 7) 依照動態階段計算三條曲線（更貼近現實：逐步變化）
   const getCurvePoints = (
     width: number,
     height: number,
@@ -1239,19 +1245,10 @@ const PhoebeCycleTracker: React.FC = () => {
     for (let day = 1; day <= totalDaysForChart; day++) {
       let intensity = 50;
 
-      // —— 生理期：較不穩定但通常「沒那麼飆」——
       const inPeriod = day <= periodEndDay;
-
-      // —— 濾泡期：較平穩、較好控制 ——
       const inFollicular = day > periodEndDay && day < ovulationStartDay;
-
-      // —— 排卵期窗口 ——
       const inOvulation = day >= ovulationStartDay && day <= ovulationEndDay;
-
-      // —— 黃體期（排卵後到 PMS 前） ——
       const inLuteal = day >= lutealStartDay && day <= lutealEndDay;
-
-      // —— PMS ——
       const inPms = day >= pmsStartDay;
 
       if (type === 'appetite') {
@@ -1260,18 +1257,14 @@ const PhoebeCycleTracker: React.FC = () => {
         else if (inOvulation) intensity = ramp(day, ovulationStartDay, ovulationEndDay, 40, 55);
         else if (inLuteal) intensity = ramp(day, lutealStartDay, lutealEndDay, 55, 65);
         else if (inPms) intensity = ramp(day, pmsStartDay, pmsEndDay, 70, 85);
-      }
-
-      if (type === 'hormone') {
-        // 這條你其實定義成「壓力感」比較直覺
+      } else if (type === 'hormone') {
+        // 你這條其實是「壓力感/敏感度」比較直覺
         if (inPeriod) intensity = ramp(day, 1, periodEndDay, 55, 50);
         else if (inFollicular) intensity = ramp(day, periodEndDay + 1, ovulationStartDay - 1, 48, 40);
         else if (inOvulation) intensity = ramp(day, ovulationStartDay, ovulationEndDay, 45, 55);
         else if (inLuteal) intensity = ramp(day, lutealStartDay, lutealEndDay, 55, 65);
         else if (inPms) intensity = ramp(day, pmsStartDay, pmsEndDay, 68, 80);
-      }
-
-      if (type === 'edema') {
+      } else if (type === 'edema') {
         if (inPeriod) intensity = ramp(day, 1, periodEndDay, 35, 30);
         else if (inFollicular) intensity = ramp(day, periodEndDay + 1, ovulationStartDay - 1, 30, 25);
         else if (inOvulation) intensity = ramp(day, ovulationStartDay, ovulationEndDay, 30, 55);
@@ -1281,55 +1274,13 @@ const PhoebeCycleTracker: React.FC = () => {
 
       const x = xForDay(day, width);
       const y = height - (intensity / 100) * height;
+
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
       points.push(`${x},${y}`);
     }
 
     return points.join(' ');
   };
-
-  // ✅ points 字串轉平滑曲線 path（Catmull-Rom → Bezier）
-  const pointsToSmoothPath = (pointsStr: string) => {
-    const pts = pointsStr
-      .trim()
-      .split(' ')
-      .map(p => p.split(',').map(Number))
-      .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) as [number, number][];
-
-    if (pts.length < 2) return '';
-
-    const d: string[] = [];
-    d.push(`M ${pts[0][0]} ${pts[0][1]}`);
-
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i - 1] || pts[i];
-      const p1 = pts[i];
-      const p2 = pts[i + 1];
-      const p3 = pts[i + 2] || p2;
-
-      const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
-      const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
-      const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
-      const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
-
-      d.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`);
-    }
-
-    return d.join(' ');
-  };
-
-  const edemaRiseDay = 25;
-  const stressRiseDay = 28;
-  const pmsPeakDay = 30;
-
-  const edemaRiseDateStr = formatShortDate(addDays(lastStartDate, edemaRiseDay - 1));
-  const stressRiseDateStr = formatShortDate(addDays(lastStartDate, stressRiseDay - 1));
-  const pmsPeakDateStr = formatShortDate(addDays(lastStartDate, pmsPeakDay - 1));
-
-  const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
-
-  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
-
 
   // --- Render ---
 
