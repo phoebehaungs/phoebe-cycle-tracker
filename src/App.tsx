@@ -1,5 +1,113 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 
+// ---------------- Types ----------------
+},
+ovulation: {
+key: 'ovulation',
+name: '排卵期',
+explanation: '今天水腫或情緒微波動，來自荷爾蒙轉換。',
+todayFocus: '多喝水，降低對身體的評分。',
+permission: '我允許身體有變化。',
+successRule: '沒有對自己生氣，就是成功。',
+color: '#FFD166',
+light: '#FFFBEB'
+},
+luteal: {
+key: 'luteal',
+name: '黃體期前段',
+explanation: '今天比較累、比較敏感，不是意志力問題。',
+todayFocus: '提前準備安全感與食物。',
+permission: '我不用撐住一切。',
+successRule: '穩住節奏就是成功。',
+color: '#A5A6F6',
+light: '#F3F4FF'
+},
+pms: {
+key: 'pms',
+name: 'PMS 高峰',
+explanation: '今天的不安與焦慮，是荷爾蒙造成的放大效應。',
+todayFocus: '先穩住情緒，再談其他。',
+permission: '我允許今天只求不崩潰。',
+successRule: '沒有失控，就是極大的成功。',
+color: '#EF476F',
+light: '#FFE5EC'
+}
+};
+
+
+// ---------------- Main Component ----------------
+
+
+const PhoebeCycleTrackerWithSupport: React.FC = () => {
+const today = new Date().toISOString().slice(0, 10);
+
+
+// Demo：直接假設目前在 PMS
+const currentPhaseKey: PhaseKey = 'pms';
+const phase = PHASE_SUPPORT[currentPhaseKey];
+
+
+const [mental, setMental] = useState<DailyMentalRecord>({
+date: today,
+anxiety: 5,
+});
+
+
+const showStabilize = mental.anxiety >= 7;
+
+
+return (
+<div style={{ maxWidth: 480, margin: '0 auto', padding: 20, fontFamily: 'Noto Sans TC, sans-serif' }}>
+<h2 style={{ color: phase.color }}>🌙 今天的身體與情緒狀態</h2>
+
+
+{/* Reason Card */}
+<div style={{ background: phase.light, padding: 16, borderRadius: 12, marginBottom: 16 }}>
+<strong>{phase.name}</strong>
+<p style={{ marginTop: 8 }}>{phase.explanation}</p>
+</div>
+
+
+{/* Anxiety Slider */}
+<div style={{ marginBottom: 16 }}>
+<label>今天的不安程度（0–10）：</label>
+<input
+type="range"
+min={0}
+max={10}
+value={mental.anxiety}
+onChange={e => setMental({ ...mental, anxiety: Number(e.target.value) })}
+style={{ width: '100%' }}
+/>
+<div>目前：{mental.anxiety}</div>
+</div>
+
+
+{/* Stabilize Mode */}
+{showStabilize && (
+<div style={{ border: `2px solid ${phase.color}`, borderRadius: 12, padding: 16, marginBottom: 16 }}>
+<h3>🫂 穩住我</h3>
+<ol>
+<li>我現在的狀態是：{phase.explanation}</li>
+<li>我現在只要做一件事：{phase.todayFocus}</li>
+<li>我對自己說：{phase.permission}</li>
+</ol>
+</div>
+)}
+
+
+{/* Success Rule */}
+<div style={{ background: '#f9f9f9', padding: 14, borderRadius: 10 }}>
+<strong>🌱 今天的成功標準</strong>
+<p>{phase.successRule}</p>
+</div>
+</div>
+);
+};
+
+
+export default PhoebeCycleTrackerWithSupport;
+
 // --- 1. Types ---
 
 type Appetite = '低' | '中' | '高' | '';
