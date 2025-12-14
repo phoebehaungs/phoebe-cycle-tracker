@@ -1274,7 +1274,7 @@ const anxietySegments = useMemo(() => buildAnxietySegments(), [mentalRecords, la
   [history]
 );
 
-const anxietySegments = useMemo(() => {
+const anxietySegments2 = useMemo(() => {
   // 收集 Day 1~34 每一天對應的 (x,y)，沒資料就用 null
   const byDay: Array<{ x: number; y: number } | null> = Array.from(
     { length: totalDaysForChart },
@@ -1511,7 +1511,7 @@ const anxietySegments = useMemo(() => {
             <polyline points={getCurvePoints(340, 150, 'edema')} fill="none" stroke={COLORS.chartBlue} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
             {/* Anxiety (real data) overlay */}
-{anxietySegments.map((pts, idx) => (
+{anxietySegments2.map((pts, idx) => (
   <polyline
     key={idx}
     points={pts}
