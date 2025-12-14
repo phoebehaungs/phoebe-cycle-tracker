@@ -107,25 +107,6 @@ interface MentalRecord {
   win: string;
 }
 
-// --- 組件 Props 定義 (解決 Implicit Any) ---
-interface PhaseBlockProps {
-  badge: string;
-  dateStr: string;
-  dayRange: string;
-  badgeColor: string;
-  badgeBg: string;
-  tip: string;
-  noBorder?: boolean;
-}
-
-interface RecordDropdownProps {
-  label: string;
-  options: string[];
-  value: string;
-  onChange: (val: string) => void;
-  accentColor: string;
-}
-
 // --- 預設資料 ---
 const INITIAL_HISTORY: CycleRecord[] = [
   { id: "1", startDate: "2025-11-05", length: 34, periodLength: 6 },
@@ -294,7 +275,6 @@ const tipBoxStyle: React.CSSProperties = { backgroundColor: "#FFFFFF", border: `
 const calendarCardStyle: React.CSSProperties = { ...baseCardStyle, marginTop: "25px", padding: "25px" };
 const calendarHeaderStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: "15px" };
 const calendarNavStyle: React.CSSProperties = { display: "flex", gap: "15px", alignItems: "center" };
-const monthTitleStyle: React.CSSProperties = { fontSize: "1.1rem", fontWeight: 800, color: COLORS.textDark, fontFamily: "Nunito, sans-serif" };
 const navButtonStyle: React.CSSProperties = { background: COLORS.primaryLight, border: "none", width: "32px", height: "32px", borderRadius: "10px", cursor: "pointer", color: COLORS.primary, fontFamily: "Nunito, sans-serif", fontWeight: "bold", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" };
 const calendarGridStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "8px" };
 const dayNameStyle: React.CSSProperties = { textAlign: "center", fontSize: "0.9rem", color: COLORS.textGrey, marginBottom: "10px", fontWeight: "bold" };
@@ -644,11 +624,21 @@ const App: React.FC = () => {
 
   useEffect(() => { if (editMode) { setEditDate(lastStartDate); setEditBleedingDays(currentPeriodLength); } }, [editMode, lastStartDate, currentPeriodLength]);
 
-  // Chart & Key Dates Calculation
-  const rules = generatePhaseRules(averageCycleLength, currentPeriodLength);
-  const ovulationPhase = rules.find(r => r.key === 'ovulation');
-  const lutealPhase = rules.find(r => r.key === 'luteal');
-  const pmsPhase = rules.find(r => r.key === 'pms');
+  // Chart Logic
+  // 小工具：平滑上升（0~1）
+  const smoothstep = (edge0, edge1, x) => {
+    const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+    return t * t * (3 - 2 * t);
+  };
+
+  const totalDaysForChart = clamp(averageCycleLength, 21, 60);
+  const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
+  const xForDayPercent = (day) => ((day - 1) / (totalDaysForChart - 1)) * 100;
+  const xForDay = (day, width) => (xForDayPercent(day) / 100) * width;
+  
+  const ovulationPhase = currentRules.find(r => r.key === 'ovulation');
+  const lutealPhase = currentRules.find(r => r.key === 'luteal');
+  const pmsPhase = currentRules.find(r => r.key === 'pms');
   
   const ovulationStartDay = ovulationPhase ? ovulationPhase.startDay : averageCycleLength - 14;
   const ovulationEndDay = ovulationPhase ? ovulationPhase.endDay : averageCycleLength - 12;
@@ -665,34 +655,43 @@ const App: React.FC = () => {
     pmsStartStr: formatShortDate(addDays(lastStartDate, pmsStartDay - 1)),
   }), [lastStartDate, ovulationStartDay, ovulationEndDay, lutealStartDay, pmsStartDay]);
 
-  // Chart Curve
-  const totalDaysForChart = clamp(averageCycleLength, 21, 60);
-  const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
-  const xForDayPercent = (day) => ((day - 1) / (totalDaysForChart - 1)) * 100;
-  const xForDay = (day, width) => (xForDayPercent(day) / 100) * width;
-  
   const getCurvePoints = (width, height, type) => {
     const points = [];
-    for (let day = 1; day <= totalDaysForChart; day++) {
-      let intensity = 50;
-      if (type === 'appetite') {
-         if (day > pmsStartDay) intensity = 90;
-         else if (day > lutealStartDay) intensity = 65;
-         else if (day >= ovulationStartDay && day <= ovulationEndDay) intensity = 55;
-         else intensity = 40;
-      } else if (type === 'stress') {
-         if (day > pmsStartDay) intensity = 85;
-         else if (day > lutealStartDay) intensity = 60;
-         else intensity = 35;
-      } else { // edema
-         if (day > pmsStartDay) intensity = 80;
-         else if (day > ovulationStartDay) intensity = 60;
-         else intensity = 30;
+    const dayMax = totalDaysForChart;
+  
+    for (let day = 1; day <= dayMax; day++) {
+      let intensity = 40; 
+  
+      if (type === "appetite") {
+        const base = 38;
+        const ovBump = 6 * smoothstep(ovulationStartDay, ovulationEndDay, day); 
+        const lutealRise = 22 * smoothstep(lutealStartDay, pmsStartDay, day);   
+        const pmsBoost = day >= pmsStartDay ? 18 : 0;                           
+        intensity = base + ovBump + lutealRise + pmsBoost; 
       }
+  
+      if (type === "stress") {
+        const base = 34;
+        const lutealRise = 28 * smoothstep(lutealStartDay, pmsStartDay, day);
+        const pmsBoost = day >= pmsStartDay ? 16 : 0;
+        intensity = base + lutealRise + pmsBoost; 
+      }
+  
+      if (type === "edema") {
+        const base = 28;
+        const ovBump = 10 * smoothstep(ovulationStartDay, ovulationEndDay, day);
+        const lutealRise = 26 * smoothstep(lutealStartDay + 1, pmsStartDay, day); 
+        const pmsBoost = day >= pmsStartDay ? 18 : 0;
+        intensity = base + ovBump + lutealRise + pmsBoost; 
+      }
+  
+      intensity = clamp(intensity, 5, 95);
+  
       const x = xForDay(day, width);
       const y = height - (intensity / 100) * height;
       points.push(`${x},${y}`);
     }
+  
     return points.join(" ");
   };
 
@@ -781,7 +780,7 @@ const App: React.FC = () => {
               <span style={summaryValueStyle}>{keyDatesText.pmsPeakDateStr}</span>
             </div>
           </div>
-          {/* Phase Blocks with null checks */}
+          {/* Phase Blocks */}
           <PhaseBlock badge="🥚 排卵期" dateStr={`${keyDatesText.ovulationStartStr} - ${keyDatesText.ovulationEndStr}`} dayRange={`Day ${ovulationStartDay}-${ovulationEndDay}`} badgeColor={COLORS.chartBlue} badgeBg="#EAF8F6" tip="此時若感到悶腫是正常的，不用硬撐。" />
           <PhaseBlock badge="🌙 黃體期" dateStr={`${keyDatesText.lutealStartStr} 起`} dayRange={`Day ${lutealStartDay}`} badgeColor={COLORS.chartPurple} badgeBg="#F2F1FF" tip="備好安全點心、熱茶、鎂，比事後補救更輕鬆。" />
           <PhaseBlock badge="🔥 PMS" dateStr={`${keyDatesText.pmsStartStr} 起`} dayRange={`Day ${pmsStartDay}`} badgeColor={COLORS.accentDark} badgeBg="#FFF0ED" tip="將成功標準改成「穩住就好」，沒失控就是成功。" noBorder />
@@ -801,7 +800,6 @@ const App: React.FC = () => {
               {dayNames.map((n, i) => <div key={i} style={dayNameStyle}>{n}</div>)}
               {generateCalendarDays.map((date, i) => {
                   const dateStr = formatLocalDate(date);
-                  // 這裡使用修正後的 getPhaseForDate
                   const phase = getPhaseForDate(date);
                   const record = getSymptomRecordForDate(dateStr);
                   const isToday = dateStr === todayStr;
@@ -817,12 +815,13 @@ const App: React.FC = () => {
            </div>
       </div>
 
-      {/* Mental Support & Other Components Omitted for brevity but logic is same */}
       <div style={mentalSupportCardStyle(currentPhase.color)}>
         <h3 style={cardTitleStyle(COLORS.textDark)}>🧠 今天的精神穩定站</h3>
         <div style={mentalTipBlockStyle(currentPhase.lightColor)}>
              <div style={{ fontWeight: "bold", color: currentPhase.color, marginBottom: 8, fontSize: "1.1rem" }}>{currentPhase.name} 的你</div>
              <div>{support.explanation}</div>
+             <div style={{marginTop:12}}>✅ <b>今天只要做一件事：</b>{support.todayFocus}</div>
+             <div style={{marginTop:8}}>🫶 <b>我允許自己：</b>{support.permission}</div>
         </div>
          <div style={{ marginTop: 20, padding: "0 5px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
@@ -832,6 +831,18 @@ const App: React.FC = () => {
                 </div>
             </div>
             <input type="range" min={0} max={10} value={todayMental.anxiety} onChange={(e) => upsertMentalForDate({ ...todayMental, anxiety: Number(e.target.value) })} style={rangeInputStyle} />
+            {showStabilize && (
+              <div style={stabilizeBlockStyle(COLORS.accent)}>
+                <div style={{ fontWeight: "bold", marginBottom: 8, color: COLORS.accentDark, display: "flex", alignItems: "center" }}>
+                  <span style={{ fontSize: "1.2rem", marginRight: "5px" }}>🚨</span> 穩住我（現在先不用解決全部）
+                </div>
+                <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7, fontSize: "0.95rem", color: COLORS.textDark }}>
+                  <li>我現在的狀態是：{support.explanation}</li>
+                  <li>我現在只要做一件事：{support.todayFocus}</li>
+                  <li>我對自己說：{support.permission}</li>
+                </ol>
+              </div>
+            )}
          </div>
       </div>
 
@@ -937,8 +948,6 @@ const App: React.FC = () => {
 };
 
 // --- SubComponents ---
-
-// 1. PhaseBlock Component for Key Dates Card
 const PhaseBlock: React.FC<PhaseBlockProps> = ({ badge, dateStr, dayRange, badgeColor, badgeBg, tip, noBorder }) => (
     <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: noBorder ? 'none' : `1px solid ${COLORS.border}` }}>
         <div style={phaseHeaderStyle}>
@@ -952,14 +961,13 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({ badge, dateStr, dayRange, badge
     </div>
 );
 
-// 2. RecordDropdown Component
 const RecordDropdown: React.FC<RecordDropdownProps> = ({ label, options, value, onChange, accentColor }) => (
   <div style={{ marginBottom: "15px" }}>
     <label style={{ fontSize: "0.95rem", color: COLORS.textDark, fontWeight: "bold", display: "block", marginBottom: "8px" }}>
       {label}
     </label>
     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-      {options.map((op) => (
+      {options.map((op: string) => (
         <button
           key={op}
           onClick={() => onChange(value === op ? "" : op)}
