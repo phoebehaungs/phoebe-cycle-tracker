@@ -1143,37 +1143,78 @@ const PhoebeCycleTracker: React.FC = () => {
   const totalDaysForChart = 34;
   const xForDay = (day: number, width: number) => ((day - 1) / (totalDaysForChart - 1)) * width;
 
-  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {
-    const points: string[] = [];
-    for (let day = 1; day <= totalDaysForChart; day++) {
-      let intensity = 50;
+  const getCurvePoints = (width: number, height: number, type: 'appetite' | 'hormone' | 'edema') => {// --- Chart Logic (改成平滑曲線版本) ---
 
-      if (type === 'appetite') {
-        if (day <= 6) intensity = 62;
-        else if (day <= 24) intensity = 92;
-        else if (day <= 27) intensity = 52;
-        else if (day <= 29) intensity = 42;
-        else intensity = 12;
-      } else if (type === 'hormone') {
-        if (day <= 14) intensity = 80;
-        else if (day <= 24) intensity = 40;
-        else if (day <= 28) intensity = 20;
-        else intensity = 85;
-      } else if (type === 'edema') {
-        if (day <= 3) intensity = 38;
-        else if (day <= 6) intensity = 68;
-        else if (day <= 24) intensity = 93;
-        else if (day <= 27) intensity = 58;
-        else if (day <= 29) intensity = 38;
-        else intensity = 8;
-      }
+const totalDaysForChart = 34;
+const xForDay = (day: number, width: number) => ((day - 1) / (totalDaysForChart - 1)) * width;
 
-      const x = xForDay(day, width);
-      const y = height - (intensity / 100) * height;
-      points.push(`${x},${y}`);
-    }
-    return points.join(' ');
-  };
+// 0~1 的平滑插值（比線性更像「慢慢上來/慢慢下去」）
+const smoothstep = (t: number) => t * t * (3 - 2 * t);
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
+const segment = (day: number, d0: number, d1: number) => clamp01((day - d0) / (d1 - d0));
+
+// 方案A：更貼近體感的「示意曲線」：濾泡期低、黃體後段才尖峰
+const getIntensity = (day: number, type: 'appetite' | 'stress' | 'edema') => {
+  // 回傳 0~100（越高代表越強烈；你畫圖是 intensity 高 -> y 越小 -> 越靠上）
+  if (type === 'appetite') {
+    // 生理期：中等（有人會偏想吃/或偏沒食慾，先給中間）
+    if (day <= 6) return 55;
+
+    // 濾泡期：最低 & 最好控制（Day 7~20）
+    if (day <= 20) return lerp(45, 35, smoothstep(segment(day, 7, 20)));
+
+    // 排卵附近：微升（20~27）
+    if (day <= 27) return lerp(35, 50, smoothstep(segment(day, 20, 27)));
+
+    // 黃體期：慢慢嘴饞上來（27~30）
+    if (day <= 30) return lerp(50, 70, smoothstep(segment(day, 27, 30)));
+
+    // PMS：短而尖的高峰（30~33）
+    if (day <= 33) return lerp(70, 90, smoothstep(segment(day, 30, 33)));
+
+    // 週期尾端：準備來月經前維持高、或略回落（33~34）
+    return 85;
+  }
+
+  if (type === 'edema') {
+    // 生理期：前段偏水腫、後段退（1~6）
+    if (day <= 6) return lerp(65, 45, smoothstep(segment(day, 1, 6)));
+
+    // 濾泡期：最低（7~20）
+    if (day <= 20) return lerp(45, 30, smoothstep(segment(day, 7, 20)));
+
+    // 排卵後開始慢慢存水（20~29）
+    if (day <= 29) return lerp(30, 60, smoothstep(segment(day, 20, 29)));
+
+    // PMS：最高（29~33）
+    if (day <= 33) return lerp(60, 85, smoothstep(segment(day, 29, 33)));
+
+    // 週期尾端：維持高
+    return 80;
+  }
+
+  // type === 'stress'
+  // 這條線用來代表「壓力/不安的易感性（示意）」：黃體期開始拉升，PMS最明顯
+  if (day <= 10) return lerp(45, 35, smoothstep(segment(day, 1, 10)));
+  if (day <= 24) return lerp(35, 40, smoothstep(segment(day, 10, 24)));
+  if (day <= 29) return lerp(40, 60, smoothstep(segment(day, 24, 29)));
+  if (day <= 33) return lerp(60, 90, smoothstep(segment(day, 29, 33)));
+  return 85;
+};
+
+const getCurvePoints = (width: number, height: number, type: 'appetite' | 'stress' | 'edema') => {
+  const points: string[] = [];
+  for (let day = 1; day <= totalDaysForChart; day++) {
+    const intensity = getIntensity(day, type);
+    const x = xForDay(day, width);
+    const y = height - (intensity / 100) * height;
+    points.push(`${x},${y}`);
+  }
+  return points.join(' ');
+};
+};
 
   const edemaRiseDay = 25;
   const stressRiseDay = 28;
@@ -1186,7 +1227,99 @@ const PhoebeCycleTracker: React.FC = () => {
   const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+// --- Anxiety overlay (用 mentalRecords 的 anxiety 疊線) ---
+const chartWidth = 340;
+const chartHeight = 150;
 
+// 把 0~10 映射到 0~100 的 intensity（越高越靠上）
+const anxietyToIntensity = (a: number) => clamp(a, 0, 10) * 10;
+
+// 產生多段 polyline points（避免中間沒填資料時拉出怪線）
+const buildAnxietySegments = () => {
+  const segments: string[] = [];
+  let current: string[] = [];
+
+  for (let day = 1; day <= totalDaysForChart; day++) {
+    const dateStr = addDays(lastStartDate, day - 1);
+    const found = mentalRecords.find(r => r.date === dateStr);
+    const hasValue = found && typeof found.anxiety === 'number';
+
+    if (!hasValue) {
+      if (current.length >= 2) segments.push(current.join(' '));
+      current = [];
+      continue;
+    }
+
+    const intensity = anxietyToIntensity(found.anxiety);
+    const x = xForDay(day, chartWidth);
+    const y = chartHeight - (intensity / 100) * chartHeight;
+    current.push(`${x},${y}`);
+  }
+
+  if (current.length >= 2) segments.push(current.join(' '));
+  return segments;
+};
+
+const anxietySegments = useMemo(() => buildAnxietySegments(), [mentalRecords, lastStartDate]);
+
+  const getCycleDayForDateStr = useCallback(
+  (dateStr: string) => {
+    const idx = findCycleIndexForDate(history, dateStr);
+    if (idx === -1) return null;
+    const cycleStart = history[idx].startDate;
+    const day = getDaysDifference(cycleStart, dateStr) + 1;
+    if (day <= 0) return null;
+    return day;
+  },
+  [history]
+);
+
+const anxietySegments = useMemo(() => {
+  // 收集 Day 1~34 每一天對應的 (x,y)，沒資料就用 null
+  const byDay: Array<{ x: number; y: number } | null> = Array.from(
+    { length: totalDaysForChart },
+    () => null
+  );
+
+  // 只處理有效範圍內的紀錄
+  for (const r of mentalRecords) {
+    if (!r || !isValidYMD(r.date)) continue;
+    const day = getCycleDayForDateStr(r.date);
+    if (!day) continue;
+    if (day < 1 || day > totalDaysForChart) continue;
+
+    // anxiety: 0~10 -> intensity: 0~100
+    const intensity = (Number(r.anxiety) / 10) * 100;
+    const x = xForDay(day, 340);
+    const y = 150 - (intensity / 100) * 150; // ⚠️ 這裡的 150 要跟你 SVG height 一致
+    byDay[day - 1] = { x, y };
+  }
+
+  // 把連續有資料的點串成 polyline points 字串，多段輸出
+  const segments: string[] = [];
+  let current: string[] = [];
+
+  const pushCurrentIfValid = () => {
+    // 至少 2 點才畫線（1 點畫出來像一個點，可能你不想要）
+    if (current.length >= 2) segments.push(current.join(' '));
+    current = [];
+  };
+
+  for (let i = 0; i < byDay.length; i++) {
+    const p = byDay[i];
+    if (!p) {
+      pushCurrentIfValid();
+      continue;
+    }
+    current.push(`${p.x},${p.y}`);
+  }
+  pushCurrentIfValid();
+
+  return segments;
+}, [mentalRecords, getCycleDayForDateStr]);
+
+
+    
   // --- Render ---
 
   return (
@@ -1361,6 +1494,7 @@ const PhoebeCycleTracker: React.FC = () => {
             <span style={{ color: COLORS.chartOrange, fontWeight:'bold' }}>● 食慾</span>
             <span style={{ color: COLORS.chartPurple, fontWeight:'bold' }}>● 壓力</span>
             <span style={{ color: COLORS.chartBlue, fontWeight:'bold' }}>● 水腫</span>
+            <span style={{ color: COLORS.textDark, fontWeight: 'bold' }}>● 不安</span>
           </div>
         </div>
 
@@ -1373,9 +1507,22 @@ const PhoebeCycleTracker: React.FC = () => {
 
             {/* Data Lines */}
             <polyline points={getCurvePoints(340, 150, 'appetite')} fill="none" stroke={COLORS.chartOrange} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <polyline points={getCurvePoints(340, 150, 'hormone')} fill="none" stroke={COLORS.chartPurple} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
+            <polyline points={getCurvePoints(340, 150, 'stress')} fill="none" stroke={COLORS.chartPurple} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" />
             <polyline points={getCurvePoints(340, 150, 'edema')} fill="none" stroke={COLORS.chartBlue} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
+            {/* Anxiety (real data) overlay */}
+{anxietySegments.map((pts, idx) => (
+  <polyline
+    key={idx}
+    points={pts}
+    fill="none"
+    stroke={COLORS.textDark}
+    strokeWidth="3.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    opacity="0.9"
+  />
+))}
             {/* Today Marker */}
             <line x1={xForDay(chartDaysPassed, 340)} y1="0" x2={xForDay(chartDaysPassed, 340)} y2="150" stroke={COLORS.textDark} strokeWidth="2" strokeDasharray="4,2" />
 
