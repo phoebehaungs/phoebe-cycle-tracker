@@ -1151,97 +1151,93 @@ const PhoebeCycleTracker: React.FC = () => {
   const totalDaysForChart = 34;
   const xForDay = (day: number, width: number) => ((day - 1) / (totalDaysForChart - 1)) * width;
 
-const getCurvePoints = (
-  width: number,
-  height: number,
-  type: 'appetite' | 'hormone' | 'edema'
-) => {
-  const points: string[] = [];
+  const getCurvePoints = (
+    width: number,
+    height: number,
+    type: 'appetite' | 'hormone' | 'edema'
+  ) => {
+    const points: string[] = [];
 
-  for (let day = 1; day <= totalDaysForChart; day++) {
-    let intensity = 50;
+    for (let day = 1; day <= totalDaysForChart; day++) {
+      let intensity = 50;
 
-    // 🍽 食慾：穩定期真的要「低」
-    if (type === 'appetite') {
-      if (day <= 3) intensity = 55;          // 生理期初
-      else if (day <= 6) intensity = 50;     // 生理期後段
-      else if (day <= 14) intensity = 35;    // 濾泡期最低
-      else if (day <= 20) intensity = 40;    // 穩定
-      else if (day <= 24) intensity = 45;    // 微升
-      else if (day <= 27) intensity = 55;    // 排卵後
-      else if (day <= 29) intensity = 65;    // 黃體前段
-      else intensity = 85;                   // PMS 高峰
+      // 🍽 食慾：穩定期真的要「低」
+      if (type === 'appetite') {
+        if (day <= 3) intensity = 55;          // 生理期初
+        else if (day <= 6) intensity = 50;     // 生理期後段
+        else if (day <= 14) intensity = 35;    // 濾泡期最低
+        else if (day <= 20) intensity = 40;    // 穩定
+        else if (day <= 24) intensity = 45;    // 微升
+        else if (day <= 27) intensity = 55;    // 排卵後
+        else if (day <= 29) intensity = 65;    // 黃體前段
+        else intensity = 85;                   // PMS 高峰
+      }
+
+      // 💜 壓力（原本 hormone）：中段回落、後段再升
+      else if (type === 'hormone') {
+        if (day <= 6) intensity = 55;
+        else if (day <= 14) intensity = 45;
+        else if (day <= 20) intensity = 40;
+        else if (day <= 24) intensity = 45;
+        else if (day <= 27) intensity = 55;
+        else if (day <= 29) intensity = 65;
+        else intensity = 80;
+      }
+
+      // 💧 水腫：慢慢堆積，不是整段爆
+      else if (type === 'edema') {
+        if (day <= 3) intensity = 30;
+        else if (day <= 6) intensity = 40;
+        else if (day <= 14) intensity = 25;    // 最輕盈
+        else if (day <= 20) intensity = 35;
+        else if (day <= 24) intensity = 45;
+        else if (day <= 27) intensity = 55;
+        else if (day <= 29) intensity = 65;
+        else intensity = 85;
+      }
+
+      const x = xForDay(day, width);
+      const y = height - (intensity / 100) * height;
+
+      // 🛡 防止 NaN 導致整條線不畫
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+      points.push(`${x},${y}`);
     }
 
-    // 💜 壓力（原本 hormone）：中段回落、後段再升
-    else if (type === 'hormone') {
-      if (day <= 6) intensity = 55;
-      else if (day <= 14) intensity = 45;
-      else if (day <= 20) intensity = 40;
-      else if (day <= 24) intensity = 45;
-      else if (day <= 27) intensity = 55;
-      else if (day <= 29) intensity = 65;
-      else intensity = 80;
+    return points.join(' ');
+  };
+
+  // ✅ points 字串轉平滑曲線 path（Catmull-Rom → Bezier）
+  const pointsToSmoothPath = (pointsStr: string) => {
+    const pts = pointsStr
+      .trim()
+      .split(' ')
+      .map(p => p.split(',').map(Number))
+      .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) as [number, number][];
+
+    if (pts.length < 2) return '';
+
+    const d: string[] = [];
+    d.push(`M ${pts[0][0]} ${pts[0][1]}`);
+
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] || p2;
+
+      const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+      const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+      const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+
+      d.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`);
     }
 
-    // 💧 水腫：慢慢堆積，不是整段爆
-    else if (type === 'edema') {
-      if (day <= 3) intensity = 30;
-      else if (day <= 6) intensity = 40;
-      else if (day <= 14) intensity = 25;    // 最輕盈
-      else if (day <= 20) intensity = 35;
-      else if (day <= 24) intensity = 45;
-      else if (day <= 27) intensity = 55;
-      else if (day <= 29) intensity = 65;
-      else intensity = 85;
-    }
+    return d.join(' ');
+  };
 
-    const x = xForDay(day, width);
-    const y = height - (intensity / 100) * height;
-
-    // 🛡 防止 NaN 導致整條線不畫
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-
-    points.push(`${x},${y}`);
-  } // ✅ 這個大括號是你原本缺的：關掉 for 迴圈
-
-  return points.join(' ');
-
-  // ✅ 把 points 字串轉成平滑曲線 path（Catmull-Rom to Bezier）
-const pointsToSmoothPath = (pointsStr: string) => {
-  const pts = pointsStr
-    .trim()
-    .split(' ')
-    .map(p => p.split(',').map(Number))
-    .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) as [number, number][];
-
-  if (pts.length < 2) return '';
-
-  const d: string[] = [];
-  d.push(`M ${pts[0][0]} ${pts[0][1]}`);
-
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] || pts[i];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[i + 2] || p2;
-
-    // Catmull-Rom → Bezier control points
-    const cp1x = p1[0] + (p2[0] - p0[0]) / 6;
-    const cp1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const cp2x = p2[0] - (p3[0] - p1[0]) / 6;
-    const cp2y = p2[1] - (p3[1] - p1[1]) / 6;
-
-    d.push(`C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`);
-  }
-
-  return d.join(' ');
-};
-
-        
-        }; // ✅ 關掉 getCurvePoints 函式
-
-        
   const edemaRiseDay = 25;
   const stressRiseDay = 28;
   const pmsPeakDay = 30;
@@ -1253,6 +1249,7 @@ const pointsToSmoothPath = (pointsStr: string) => {
   const chartDaysPassed = clamp(daysPassed, 1, totalDaysForChart);
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+
 
   // --- Render ---
 
