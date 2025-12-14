@@ -107,6 +107,25 @@ interface MentalRecord {
   win: string;
 }
 
+// 補上這兩個 Interface 以免 TS 報錯
+interface PhaseBlockProps {
+  badge: string;
+  dateStr: string;
+  dayRange: string;
+  badgeColor: string;
+  badgeBg: string;
+  tip: string;
+  noBorder?: boolean;
+}
+
+interface RecordDropdownProps {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (val: string) => void;
+  accentColor: string;
+}
+
 // --- 預設資料 ---
 const INITIAL_HISTORY: CycleRecord[] = [
   { id: "1", startDate: "2025-11-05", length: 34, periodLength: 6 },
@@ -119,6 +138,79 @@ const SYMPTOM_OPTIONS: Record<"appetite" | "mood" | "body" | "sleep", string[]> 
   body: ["無水腫", "微水腫", "水腫明顯"],
   sleep: ["良好", "普通", "睡不好"],
 };
+
+const PHASE_RULES: PhaseDefinition[] = [
+  {
+    name: "生理期",
+    startDay: 1,
+    endDay: 6,
+    symptoms: ["疲倦、想休息", "水腫慢慢消退中", "偶爾子宮悶感"],
+    diet: ["食慾偏低/正常", "想吃冰(荷爾蒙反應)"],
+    care: ["不逼自己運動", "多喝暖身飲", "早餐多一點蛋白質"],
+    tips: "這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。",
+    color: "#B5A0D9",
+    lightColor: "#F2EFF9",
+    hormone: "雌激素與黃體素低點",
+    accent: "#B5A0D9",
+    key: "period"
+  },
+  {
+    name: "濾泡期 (黃金期)",
+    startDay: 7,
+    endDay: 24,
+    symptoms: ["精力恢復", "身體最輕盈(無水腫)", "心情平穩"],
+    diet: ["食慾最低", "最好控制", "飽足感良好"],
+    care: ["適合減脂/建立習慣", "Zumba/伸展效果好"],
+    tips: "現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！",
+    color: "#7FCCC3",
+    lightColor: "#EDF7F6",
+    hormone: "雌激素逐漸上升",
+    accent: "#7FCCC3",
+    key: "follicular"
+  },
+  {
+    name: "排卵期",
+    startDay: 25,
+    endDay: 27,
+    symptoms: ["下腹悶、體溫升高", "出現微水腫"],
+    diet: ["食慾微增", "有些人想吃甜"],
+    care: ["多喝水、多吃蔬菜", "補充可溶性纖維"],
+    tips: "這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。",
+    color: "#F6D776",
+    lightColor: "#FFFBEB",
+    hormone: "黃體生成素(LH)高峰",
+    accent: "#E0C25E",
+    key: "ovulation"
+  },
+  {
+    name: "黃體期前段",
+    startDay: 28,
+    endDay: 29,
+    symptoms: ["較容易累", "情緒敏感", "水腫感變明顯"],
+    diet: ["開始嘴饞", "想吃頻率變高"],
+    care: ["早餐加蛋白質", "下午備好安全點心"],
+    tips: "提前兩天準備，比發生後補救更有效。",
+    color: "#7F8CE0",
+    lightColor: "#E8EAF6",
+    hormone: "黃體素開始上升",
+    accent: "#7F8CE0",
+    key: "luteal"
+  },
+  {
+    name: "PMS 高峰",
+    startDay: 30,
+    endDay: 33,
+    symptoms: ["焦慮、情緒緊繃", "嚴重水腫、睡不好", "身心較沒安全感"],
+    diet: ["想吃甜、想吃冰", "正餐後仍想吃"],
+    care: ["補充鎂(減少焦慮)", "允許多吃 5～10%", "熱茶/小毯子/深呼吸"],
+    tips: "這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。",
+    color: "#E07F8C",
+    lightColor: "#FFF0F3",
+    hormone: "黃體素高峰 / 準備下降",
+    accent: "#E07F8C",
+    key: "pms"
+  },
+];
 
 const PHASE_SUPPORT: Record<PhaseKey, PhaseSupport> = {
   period: {
@@ -152,10 +244,6 @@ const PHASE_SUPPORT: Record<PhaseKey, PhaseSupport> = {
     successRule: "沒有失控，就是極大的成功。",
   },
 };
-
-const PHASE_RULES: PhaseDefinition[] = [
-  { name: "生理期", key: "period", startDay: 1, endDay: 6, color: COLORS.period, lightColor: "#F2EFF9", accent: COLORS.period, hormone: "雌激素與黃體素低點", tips: "這段是妳最「穩定」的時候。", symptoms: ["疲倦"], diet: [], care: [] },
-]; 
 
 // ==========================================
 // 2. 核心邏輯：動態規則生成器
@@ -275,6 +363,8 @@ const tipBoxStyle: React.CSSProperties = { backgroundColor: "#FFFFFF", border: `
 const calendarCardStyle: React.CSSProperties = { ...baseCardStyle, marginTop: "25px", padding: "25px" };
 const calendarHeaderStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: "15px" };
 const calendarNavStyle: React.CSSProperties = { display: "flex", gap: "15px", alignItems: "center" };
+// 補回 monthTitleStyle
+const monthTitleStyle: React.CSSProperties = { fontSize: "1.1rem", fontWeight: 800, color: COLORS.textDark, fontFamily: "Nunito, sans-serif" };
 const navButtonStyle: React.CSSProperties = { background: COLORS.primaryLight, border: "none", width: "32px", height: "32px", borderRadius: "10px", cursor: "pointer", color: COLORS.primary, fontFamily: "Nunito, sans-serif", fontWeight: "bold", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" };
 const calendarGridStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "8px" };
 const dayNameStyle: React.CSSProperties = { textAlign: "center", fontSize: "0.9rem", color: COLORS.textGrey, marginBottom: "10px", fontWeight: "bold" };
@@ -567,7 +657,7 @@ const App: React.FC = () => {
   }, [currentMonth]);
 
   // Handlers
-  const handleDateClick = (date) => {
+  const handleDateClick = (date: Date) => {
     const dateStr = formatLocalDate(date);
     const phase = getPhaseForDate(date);
     if (!phase) return;
@@ -800,6 +890,7 @@ const App: React.FC = () => {
               {dayNames.map((n, i) => <div key={i} style={dayNameStyle}>{n}</div>)}
               {generateCalendarDays.map((date, i) => {
                   const dateStr = formatLocalDate(date);
+                  // 這裡使用修正後的 getPhaseForDate
                   const phase = getPhaseForDate(date);
                   const record = getSymptomRecordForDate(dateStr);
                   const isToday = dateStr === todayStr;
@@ -815,6 +906,7 @@ const App: React.FC = () => {
            </div>
       </div>
 
+      {/* Mental Support & Other Components Omitted for brevity but logic is same */}
       <div style={mentalSupportCardStyle(currentPhase.color)}>
         <h3 style={cardTitleStyle(COLORS.textDark)}>🧠 今天的精神穩定站</h3>
         <div style={mentalTipBlockStyle(currentPhase.lightColor)}>
@@ -948,6 +1040,8 @@ const App: React.FC = () => {
 };
 
 // --- SubComponents ---
+
+// 1. PhaseBlock Component for Key Dates Card
 const PhaseBlock: React.FC<PhaseBlockProps> = ({ badge, dateStr, dayRange, badgeColor, badgeBg, tip, noBorder }) => (
     <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: noBorder ? 'none' : `1px solid ${COLORS.border}` }}>
         <div style={phaseHeaderStyle}>
@@ -961,6 +1055,7 @@ const PhaseBlock: React.FC<PhaseBlockProps> = ({ badge, dateStr, dayRange, badge
     </div>
 );
 
+// 2. RecordDropdown Component
 const RecordDropdown: React.FC<RecordDropdownProps> = ({ label, options, value, onChange, accentColor }) => (
   <div style={{ marginBottom: "15px" }}>
     <label style={{ fontSize: "0.95rem", color: COLORS.textDark, fontWeight: "bold", display: "block", marginBottom: "8px" }}>
