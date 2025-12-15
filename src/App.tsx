@@ -2,14 +2,13 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 
 // ==========================================
-// 1. 基礎設定與常數 (最優先定義)
+// 1. 基礎設定與常數
 // ==========================================
 
 const LOCAL_STORAGE_KEY = "phoebeCycleHistory";
 const SYMPTOM_STORAGE_KEY = "phoebeSymptomRecords";
 const MENTAL_STORAGE_KEY = "phoebeMentalRecords";
 
-// 配色方案
 const COLORS = {
   primary: "#7F8CE0",
   primaryLight: "#E8EAF6",
@@ -30,26 +29,18 @@ const COLORS = {
   pms: "#E07F8C"
 };
 
-// --- Helper: 安全讀取 localStorage (防 SSR) ---
+// --- Helper ---
 const safeGetItem = (key: string) => {
   if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
+  try { return window.localStorage.getItem(key); } catch { return null; }
 };
 
 const safeJsonParse = <T,>(raw: string | null, fallback: T): T => {
   if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
+  try { return JSON.parse(raw) as T; } catch { return fallback; }
 };
 
-// --- 資料定義 ---
+// --- Types ---
 type Appetite = "低" | "中" | "高" | "";
 type Mood = "穩定" | "敏感/焦慮" | "低落" | "";
 type Body = "無水腫" | "微水腫" | "水腫明顯" | "";
@@ -58,6 +49,7 @@ type PhaseKey = "period" | "follicular" | "ovulation" | "luteal" | "pms";
 
 interface PhaseDefinition {
   name: string;
+  key: PhaseKey;
   startDay: number;
   endDay: number;
   symptoms: string[];
@@ -68,7 +60,6 @@ interface PhaseDefinition {
   lightColor: string;
   hormone: string;
   accent: string;
-  key: PhaseKey;
 }
 
 interface CycleRecord {
@@ -125,7 +116,7 @@ interface RecordDropdownProps {
   accentColor: string;
 }
 
-// --- 預設資料 ---
+// --- Data ---
 const INITIAL_HISTORY: CycleRecord[] = [
   { id: "1", startDate: "2025-11-05", length: 34, periodLength: 6 },
   { id: "2", startDate: "2025-12-10", length: null, periodLength: 6 },
@@ -138,58 +129,16 @@ const SYMPTOM_OPTIONS: Record<"appetite" | "mood" | "body" | "sleep", string[]> 
   sleep: ["良好", "普通", "睡不好"],
 };
 
-const PHASE_RULES: PhaseDefinition[] = [
-  {
-    name: "生理期",
-    startDay: 1,
-    endDay: 6,
-    symptoms: ["疲倦、想休息", "水腫慢慢消退中", "偶爾子宮悶感"],
-    diet: ["食慾偏低/正常", "想吃冰(荷爾蒙反應)"],
-    care: ["不逼自己運動", "多喝暖身飲", "早餐多一點蛋白質"],
-    tips: "這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。",
-    color: "#B5A0D9",
-    lightColor: "#F2EFF9",
-    hormone: "雌激素與黃體素低點",
-    accent: "#B5A0D9",
-    key: "period"
-  },
-];
-
 const PHASE_SUPPORT: Record<PhaseKey, PhaseSupport> = {
-  period: {
-    explanation: "今天比較累或想休息，是荷爾蒙低點的正常反應，不代表妳變弱。",
-    todayFocus: "把目標縮小：吃好一餐、睡早一點，其他先放下。",
-    permission: "我允許自己慢下來。",
-    successRule: "今天只要照顧好自己，就是成功。",
-  },
-  follicular: {
-    explanation: "今天比較有掌控感，是雌激素上升帶來的自然狀態。",
-    todayFocus: "只做一個小習慣：例如 10 分鐘伸展或備一份安全點心。",
-    permission: "我不用一次做到全部。",
-    successRule: "願意開始、願意維持，就算成功。",
-  },
-  ovulation: {
-    explanation: "今天的波動（悶、腫、敏感）更像荷爾蒙轉換期的反應。",
-    todayFocus: "多喝水 + 不做體重評分，把注意力放回身體感受。",
-    permission: "我允許身體有變化。",
-    successRule: "沒有對自己生氣，就是成功。",
-  },
-  luteal: {
-    explanation: "今天更敏感、較疲倦，不是意志力問題，是黃體素影響。",
-    todayFocus: "提前準備安全感：把點心、熱茶、熱敷先放到位。",
-    permission: "我不用撐住一切。",
-    successRule: "穩住節奏、沒有用責備逼自己，就是成功。",
-  },
-  pms: {
-    explanation: "今天的不安會被放大，是荷爾蒙造成的放大鏡，不代表妳失控。",
-    todayFocus: "先穩住情緒再談飲食：喝水/熱敷/洗澡，先做一件事。",
-    permission: "我允許今天只求不崩潰。",
-    successRule: "沒有失控，就是極大的成功。",
-  },
+  period: { explanation: "今天比較累或想休息，是荷爾蒙低點的正常反應，不代表妳變弱。", todayFocus: "把目標縮小：吃好一餐、睡早一點，其他先放下。", permission: "我允許自己慢下來。", successRule: "今天只要照顧好自己，就是成功。" },
+  follicular: { explanation: "今天比較有掌控感，是雌激素上升帶來的自然狀態。", todayFocus: "只做一個小習慣：例如 10 分鐘伸展或備一份安全點心。", permission: "我不用一次做到全部。", successRule: "願意開始、願意維持，就算成功。" },
+  ovulation: { explanation: "今天的波動（悶、腫、敏感）更像荷爾蒙轉換期的反應。", todayFocus: "多喝水 + 不做體重評分，把注意力放回身體感受。", permission: "我允許身體有變化。", successRule: "沒有對自己生氣，就是成功。" },
+  luteal: { explanation: "今天更敏感、較疲倦，不是意志力問題，是黃體素影響。", todayFocus: "提前準備安全感：把點心、熱茶、熱敷先放到位。", permission: "我不用撐住一切。", successRule: "穩住節奏、沒有用責備逼自己，就是成功。" },
+  pms: { explanation: "今天的不安會被放大，是荷爾蒙造成的放大鏡，不代表妳失控。", todayFocus: "先穩住情緒再談飲食：喝水/熱敷/洗澡，先做一件事。", permission: "我允許今天只求不崩潰。", successRule: "沒有失控，就是極大的成功。" },
 };
 
 // ==========================================
-// 2. 核心邏輯：動態規則生成器
+// 2. Logic: Dynamic Rules
 // ==========================================
 
 const generatePhaseRules = (cycleLength: number, periodLength: number): PhaseDefinition[] => {
@@ -203,41 +152,16 @@ const generatePhaseRules = (cycleLength: number, periodLength: number): PhaseDef
   const lutealPhaseEnd = pmsStart - 1;
 
   return [
-    {
-      name: "生理期", key: "period", startDay: 1, endDay: periodLength,
-      color: COLORS.period, lightColor: "#F2EFF9", accent: COLORS.period,
-      hormone: "雌激素與黃體素低點", tips: "這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。",
-      symptoms: ["疲倦、想休息", "水腫慢慢消退中"], diet: ["食慾偏低/正常", "想吃冰"], care: ["不逼自己運動", "多喝暖身飲"],
-    },
-    {
-      name: "濾泡期 (黃金期)", key: "follicular", startDay: periodLength + 1, endDay: follicularEnd,
-      color: COLORS.follicular, lightColor: "#EDF7F6", accent: COLORS.follicular,
-      hormone: "雌激素逐漸上升", tips: "現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！",
-      symptoms: ["精力恢復", "身體最輕盈"], diet: ["食慾最低", "最好控制"], care: ["適合減脂/建立習慣"],
-    },
-    {
-      name: "排卵期", key: "ovulation", startDay: ovulationStart, endDay: ovulationEnd,
-      color: COLORS.ovulation, lightColor: "#FFFBEB", accent: "#E0C25E",
-      hormone: "黃體生成素(LH)高峰", tips: "這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。",
-      symptoms: ["下腹悶、體溫升高", "出現微水腫"], diet: ["食慾微增", "有些人想吃甜"], care: ["多喝水", "補充可溶性纖維"],
-    },
-    {
-      name: "黃體期前段", key: "luteal", startDay: lutealPhaseStart, endDay: lutealPhaseEnd,
-      color: COLORS.luteal, lightColor: "#E8EAF6", accent: COLORS.luteal,
-      hormone: "黃體素開始上升", tips: "提前兩天準備，比發生後補救更有效。",
-      symptoms: ["較容易累", "情緒敏感"], diet: ["開始嘴饞", "想吃頻率變高"], care: ["早餐加蛋白質", "下午備好安全點心"],
-    },
-    {
-      name: "PMS 高峰", key: "pms", startDay: pmsStart, endDay: cycleLength,
-      color: COLORS.pms, lightColor: "#FFF0F3", accent: COLORS.pms,
-      hormone: "黃體素高峰 / 準備下降", tips: "這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。",
-      symptoms: ["焦慮、情緒緊繃", "嚴重水腫"], diet: ["想吃甜、想吃冰"], care: ["補充鎂", "允許多吃 5～10%"],
-    },
+    { name: "生理期", key: "period", startDay: 1, endDay: periodLength, color: COLORS.period, lightColor: "#F2EFF9", accent: COLORS.period, hormone: "雌激素與黃體素低點", tips: "這段是妳最「穩定」的時候，水腫正在代謝，適合讓身體慢慢調整。", symptoms: ["疲倦、想休息", "水腫慢慢消退中"], diet: ["食慾偏低/正常", "想吃冰"], care: ["不逼自己運動", "多喝暖身飲"] },
+    { name: "濾泡期 (黃金期)", key: "follicular", startDay: periodLength + 1, endDay: follicularEnd, color: COLORS.follicular, lightColor: "#EDF7F6", accent: COLORS.follicular, hormone: "雌激素逐漸上升", tips: "現在是身體最輕盈、代謝最好的時候，如果妳希望建立新習慣，這段最成功！", symptoms: ["精力恢復", "身體最輕盈"], diet: ["食慾最低", "最好控制"], care: ["適合減脂/建立習慣"] },
+    { name: "排卵期", key: "ovulation", startDay: ovulationStart, endDay: ovulationEnd, color: COLORS.ovulation, lightColor: "#FFFBEB", accent: "#E0C25E", hormone: "黃體生成素(LH)高峰", tips: "這段是往黃體期過渡，水分開始滯留，記得多喝水幫助代謝。", symptoms: ["下腹悶、體溫升高", "出現微水腫"], diet: ["食慾微增", "有些人想吃甜"], care: ["多喝水", "補充可溶性纖維"] },
+    { name: "黃體期前段", key: "luteal", startDay: lutealPhaseStart, endDay: lutealPhaseEnd, color: COLORS.luteal, lightColor: "#E8EAF6", accent: COLORS.luteal, hormone: "黃體素開始上升", tips: "提前兩天準備，比發生後補救更有效。", symptoms: ["較容易累", "情緒敏感"], diet: ["開始嘴饞", "想吃頻率變高"], care: ["早餐加蛋白質", "下午備好安全點心"] },
+    { name: "PMS 高峰", key: "pms", startDay: pmsStart, endDay: cycleLength, color: COLORS.pms, lightColor: "#FFF0F3", accent: COLORS.pms, hormone: "黃體素高峰 / 準備下降", tips: "這是最辛苦的時段，身體水腫和食慾都是最高峰，請對自己特別溫柔。", symptoms: ["焦慮、情緒緊繃", "嚴重水腫"], diet: ["想吃甜、想吃冰"], care: ["補充鎂", "允許多吃 5～10%"] },
   ];
 };
 
 // ==========================================
-// 3. 樣式定義 (Styles)
+// 3. Styles
 // ==========================================
 
 const appContainerStyle: React.CSSProperties = { maxWidth: "600px", margin: "0 auto", padding: "0 20px 40px", fontFamily: "Noto Sans TC, sans-serif", backgroundColor: COLORS.bgApp, minHeight: "100vh", letterSpacing: "0.02em", color: COLORS.textDark };
@@ -247,11 +171,12 @@ const headerTitleStyle: React.CSSProperties = { fontSize: "1.5rem", margin: 0, c
 
 const baseCardStyle: React.CSSProperties = { backgroundColor: COLORS.bgCard, padding: "25px", borderRadius: "24px", boxShadow: "0 8px 20px rgba(0,0,0,0.04)", transition: "all 0.3s ease", border: `1px solid ${COLORS.border}` };
 const dashboardCardStyle: React.CSSProperties = { ...baseCardStyle, marginBottom: "25px", padding: "30px 25px" };
-const todayStatusContainerStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "25px" };
-const todayDateStyle: React.CSSProperties = { fontSize: "2.2rem", fontWeight: 800, color: COLORS.textDark, fontFamily: "Nunito, sans-serif", lineHeight: 1 };
+
+const todayStatusContainerStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" };
+const todayDateStyle: React.CSSProperties = { fontSize: "2.2rem", fontWeight: 800, color: COLORS.textDark, fontFamily: "Nunito, sans-serif", lineHeight: 1, whiteSpace: "nowrap" };
 const todayLabelStyle: React.CSSProperties = { fontSize: "1rem", color: COLORS.textGrey, fontWeight: 500, marginBottom: "5px", display: "block" };
 
-const editCycleButtonStyle: React.CSSProperties = { background: COLORS.accent, border: "none", color: "white", fontWeight: "bold", cursor: "pointer", fontFamily: "Noto Sans TC, sans-serif", padding: "10px 16px", borderRadius: "30px", fontSize: "0.9rem", boxShadow: "0 4px 10px rgba(255, 173, 143, 0.3)", transition: "transform 0.1s" };
+const editCycleButtonStyle: React.CSSProperties = { background: COLORS.accent, border: "none", color: "white", fontWeight: "bold", cursor: "pointer", fontFamily: "Noto Sans TC, sans-serif", padding: "10px 16px", borderRadius: "30px", fontSize: "0.9rem", boxShadow: "0 4px 10px rgba(255, 173, 143, 0.3)", transition: "transform 0.1s", whiteSpace: "nowrap" };
 
 const circularChartContainerStyle: React.CSSProperties = { display: "flex", alignItems: "center", margin: "25px 0 30px" };
 const circularChartStyle = (color: string, percent: number): React.CSSProperties => ({ width: "130px", height: "130px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 8px 20px ${color}33`, background: `conic-gradient(${color} ${percent}%, ${COLORS.primaryLight} ${percent}%)`, flexShrink: 0 });
@@ -262,8 +187,10 @@ const statusTextStyle: React.CSSProperties = { marginLeft: "30px", textAlign: "l
 const phaseTipsStyle = (lightColor: string, color: string): React.CSSProperties => ({ marginTop: "20px", fontSize: "0.95rem", color: COLORS.textDark, backgroundColor: lightColor, padding: "15px", borderRadius: "16px", borderLeft: `4px solid ${color}`, lineHeight: "1.6" });
 
 const cardStyle = (borderColor: string, bgColor: string = COLORS.bgCard): React.CSSProperties => ({ ...baseCardStyle, padding: "20px", marginTop: "20px", boxShadow: "none", border: `1px solid ${borderColor}`, backgroundColor: bgColor === "transparent" ? COLORS.bgCard : bgColor });
-const cardTitleStyle = (color: string, noBorder = false): React.CSSProperties => ({ fontSize: "1.15rem", borderBottom: noBorder ? "none" : `1px solid ${COLORS.border}`, paddingBottom: noBorder ? "0" : "12px", marginBottom: noBorder ? "15px" : "20px", color, fontWeight: 800 });
+const cardTitleStyle = (color: string, noBorder = false): React.CSSProperties => ({ fontSize: "1.15rem", borderBottom: noBorder ? "none" : `1px solid ${COLORS.border}`, paddingBottom: noBorder ? "0" : "12px", marginBottom: noBorder ? "15px" : "20px", color, fontWeight: 800, whiteSpace: "nowrap" });
 
+// ⚠️ 補回的樣式
+const symptomCardStyle: React.CSSProperties = { ...baseCardStyle, padding: "25px" };
 const listListStyle: React.CSSProperties = { paddingLeft: "20px", lineHeight: "1.8", color: COLORS.textDark, margin: 0, fontSize: "1rem" };
 const careListStyle: React.CSSProperties = { paddingLeft: "20px", lineHeight: "1.8", color: COLORS.textDark, margin: 0, fontSize: "1rem" };
 
@@ -306,7 +233,8 @@ const tipBoxStyle: React.CSSProperties = { backgroundColor: "#FFFFFF", border: `
 const calendarCardStyle: React.CSSProperties = { ...baseCardStyle, marginTop: "25px", padding: "25px" };
 const calendarHeaderStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: `1px solid ${COLORS.border}`, paddingBottom: "15px" };
 const calendarNavStyle: React.CSSProperties = { display: "flex", gap: "15px", alignItems: "center" };
-const monthTitleStyle: React.CSSProperties = { fontSize: "1.1rem", fontWeight: 800, color: COLORS.textDark, fontFamily: "Nunito, sans-serif" };
+// ⚠️ 補回 monthTitleStyle
+const monthTitleStyle: React.CSSProperties = { fontSize: "1.1rem", fontWeight: 800, color: COLORS.textDark, fontFamily: "Nunito, sans-serif", whiteSpace: "nowrap" };
 const navButtonStyle: React.CSSProperties = { background: COLORS.primaryLight, border: "none", width: "32px", height: "32px", borderRadius: "10px", cursor: "pointer", color: COLORS.primary, fontFamily: "Nunito, sans-serif", fontWeight: "bold", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" };
 const calendarGridStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "8px" };
 const dayNameStyle: React.CSSProperties = { textAlign: "center", fontSize: "0.9rem", color: COLORS.textGrey, marginBottom: "10px", fontWeight: "bold" };
@@ -329,8 +257,6 @@ const predictionDateStyle = (color: string): React.CSSProperties => ({ fontSize:
 const inputStyle: React.CSSProperties = { width: "100%", padding: "12px 15px", borderRadius: "12px", border: `1px solid ${COLORS.border}`, boxSizing: "border-box", fontFamily: "Noto Sans TC, sans-serif", marginTop: "8px", fontSize: "1rem", color: COLORS.textDark, backgroundColor: "#F8F9FC", outline: "none" };
 const textareaStyle: React.CSSProperties = { ...inputStyle, resize: "vertical", lineHeight: "1.6" };
 const recordButtonStyle: React.CSSProperties = { width: "100%", padding: "14px", backgroundColor: COLORS.accent, color: "white", border: "none", borderRadius: "14px", marginTop: "20px", fontSize: "1.05rem", fontWeight: "bold", cursor: "pointer", boxShadow: `0 4px 12px ${COLORS.accent}40` };
-
-const symptomCardStyle: React.CSSProperties = { ...baseCardStyle, padding: "25px" };
 
 const modalOverlayStyle: React.CSSProperties = { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(51, 51, 68, 0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" };
 const modalContentStyle: React.CSSProperties = { backgroundColor: COLORS.bgCard, padding: "35px", borderRadius: "28px", maxWidth: "90%", width: "400px", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" };
@@ -576,24 +502,20 @@ const App: React.FC = () => {
       return undefined;
   }, [history, averageCycleLength]);
 
+  // ⚠️ 補回缺失的 generateCalendarDays
   const generateCalendarDays = useMemo(() => {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
     const days: Date[] = [];
     const firstDay = start.getDay(); 
     for (let i = 0; i < firstDay; i++) {
-        const d = new Date(start);
-        d.setDate(start.getDate() - (firstDay - i));
-        days.push(d);
+        const d = new Date(start); d.setDate(start.getDate() - (firstDay - i)); days.push(d);
     }
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         days.push(new Date(d));
     }
     while (days.length % 7 !== 0) {
-        const last = days[days.length - 1];
-        const next = new Date(last);
-        next.setDate(last.getDate() + 1);
-        days.push(next);
+        const last = days[days.length - 1]; const next = new Date(last); next.setDate(last.getDate() + 1); days.push(next);
     }
     return days;
   }, [currentMonth]);
@@ -795,7 +717,6 @@ const App: React.FC = () => {
           <span>Day {totalDaysForChart}</span>
         </div>
 
-        {/* ---------------- 卡片式週期窗口 (優化版) ---------------- */}
         <div style={keyDatesCardStyle}>
           <h4 style={keyDatesTitleStyle}><span>📅</span> 週期關鍵窗口</h4>
           <div style={summaryGridStyle}>
@@ -812,7 +733,6 @@ const App: React.FC = () => {
               <span style={summaryValueStyle}>{keyDatesText.pmsPeakDateStr}</span>
             </div>
           </div>
-          {/* Phase Blocks */}
           <PhaseBlock badge="🥚 排卵期" dateStr={`${keyDatesText.ovulationStartStr} - ${keyDatesText.ovulationEndStr}`} dayRange={`Day ${ovulationStartDay}-${ovulationEndDay}`} badgeColor={COLORS.chartBlue} badgeBg="#EAF8F6" tip="此時若感到悶腫是正常的，不用硬撐。" />
           <PhaseBlock badge="🌙 黃體期" dateStr={`${keyDatesText.lutealStartStr} 起`} dayRange={`Day ${lutealStartDay}`} badgeColor={COLORS.chartPurple} badgeBg="#F2F1FF" tip="備好安全點心、熱茶、鎂，比事後補救更輕鬆。" />
           <PhaseBlock badge="🔥 PMS" dateStr={`${keyDatesText.pmsStartStr} 起`} dayRange={`Day ${pmsStartDay}`} badgeColor={COLORS.accentDark} badgeBg="#FFF0ED" tip="將成功標準改成「穩住就好」，沒失控就是成功。" noBorder />
@@ -848,7 +768,6 @@ const App: React.FC = () => {
            </div>
       </div>
 
-      {/* Mental Support & Other Components Omitted for brevity but logic is same */}
       <div style={mentalSupportCardStyle(currentPhase.color)}>
         <h3 style={cardTitleStyle(COLORS.textDark)}>🧠 今天的精神穩定站</h3>
         <div style={mentalTipBlockStyle(currentPhase.lightColor)}>
@@ -868,17 +787,15 @@ const App: React.FC = () => {
             {/* 最近 7 天不安指數趨勢 */}
             <div style={recentTrendBlockStyle}>
               <div style={recentTrendHeaderStyle}>
-                <div style={{ fontWeight: 'bold', color: COLORS.textDark }}>📈 最近 7 天不安指數趨勢</div>
-                <div style={{ fontFamily: 'Nunito, sans-serif', color: COLORS.textGrey, fontWeight: 700 }}>
+                <div style={{ fontWeight: "bold", color: COLORS.textDark }}>📈 最近 7 天不安指數趨勢</div>
+                <div style={{ fontFamily: "Nunito, sans-serif", color: COLORS.textGrey, fontWeight: 700 }}>
                   平均 {recentAvg}
                 </div>
               </div>
         
               <div style={sparklineWrapStyle}>
-                <svg viewBox="0 0 320 70" style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
-                  {/* 基準線 */}
+                <svg viewBox="0 0 320 70" style={{ width: "100%", height: "100%" }} preserveAspectRatio="none">
                   <line x1="0" y1="35" x2="320" y2="35" stroke={COLORS.border} strokeWidth="1" opacity="0.8" />
-                  {/* 趨勢線 */}
                   <polyline
                     points={sparkPoints}
                     fill="none"
@@ -887,7 +804,6 @@ const App: React.FC = () => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
-                  {/* 點點 */}
                   {recentAnxietySeries.map((p, idx) => {
                     const x = 10 + (idx / (recentAnxietySeries.length - 1)) * (320 - 20);
                     const y = 10 + ((10 - p.anxiety) / 10) * (70 - 20);
@@ -899,7 +815,7 @@ const App: React.FC = () => {
               <div style={recentListStyle}>
                 {recentAnxietySeries.map(p => (
                   <div key={p.date} style={recentRowStyle}>
-                    <span style={{ width: 54, fontFamily: 'Nunito, sans-serif', color: COLORS.textGrey, fontWeight: 700 }}>
+                    <span style={{ width: 54, fontFamily: "Nunito, sans-serif", color: COLORS.textGrey, fontWeight: 700 }}>
                       {formatShortDate(p.date)}
                     </span>
         
@@ -907,7 +823,7 @@ const App: React.FC = () => {
                       <div style={recentBarFillStyle((p.anxiety / 10) * 100)} />
                     </div>
         
-                    <span style={{ width: 28, textAlign: 'right', fontFamily: 'Nunito, sans-serif', fontWeight: 800 }}>
+                    <span style={{ width: 28, textAlign: "right", fontFamily: "Nunito, sans-serif", fontWeight: 800 }}>
                       {p.anxiety}
                     </span>
                   </div>
@@ -968,15 +884,13 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gap: '15px', marginTop: '20px' }}>
-        <div style={symptomCardStyle}>
-          <h3 style={cardTitleStyle(COLORS.textDark, false)}>🌡️ 身體症狀與食慾預測</h3>
-          <ul style={listListStyle}>
-            {[...currentPhase.symptoms, ...currentPhase.diet].map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ul>
-        </div>
+      <div style={symptomCardStyle}>
+        <h3 style={cardTitleStyle(COLORS.textDark, false)}>🌡️ 身體症狀與食慾預測</h3>
+        <ul style={listListStyle}>
+          {[...currentPhase.symptoms, ...currentPhase.diet].map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ul>
       </div>
 
       {modalDetail && currentRecord && (
@@ -988,7 +902,7 @@ const App: React.FC = () => {
             </div>
             <p style={modalPhaseDetailStyle}>
               週期日: <strong style={modalCycleDayStyle}>Day {modalDetail.day}</strong>
-              <span style={{margin:'0 8px', color:COLORS.border}}>|</span>
+              <span style={{margin:"0 8px", color:COLORS.border}}>|</span>
               階段: <strong style={{ color: modalDetail.phase.color }}>{modalDetail.phase.name}</strong>
             </p>
 
@@ -1049,7 +963,7 @@ const App: React.FC = () => {
 
 // --- SubComponents ---
 const PhaseBlock: React.FC<PhaseBlockProps> = ({ badge, dateStr, dayRange, badgeColor, badgeBg, tip, noBorder }) => (
-    <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: noBorder ? 'none' : `1px solid ${COLORS.border}` }}>
+    <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: noBorder ? "none" : `1px solid ${COLORS.border}` }}>
         <div style={phaseHeaderStyle}>
             <span style={phaseBadgeStyle(badgeColor, badgeBg)}>{badge}</span>
             <div style={phaseDateStyle}>
