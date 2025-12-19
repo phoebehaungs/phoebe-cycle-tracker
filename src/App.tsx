@@ -925,7 +925,18 @@ const App: React.FC = () => {
           <div style={{ fontWeight: "bold", color: currentPhase.color, marginBottom: 8, fontSize: "1.1rem" }}>{currentPhase.name} 的你</div>
           <div>{support.explanation}</div>
           <div style={{ marginTop: 12 }}>✅ <b>今天只要做一件事：</b>{support.todayFocus}</div>
-          <div style={{ marginTop: 8 }}>🫶 <b>我允許自己：</b>{support.permission}</div>
+          <div style={{ marginTop: 8 }}>
+  <span
+    style={{
+      fontFamily: 'Apple Color Emoji, "Segoe UI Emoji", "Noto Color Emoji", sans-serif',
+      marginRight: 6
+    }}
+  >
+    🫶
+  </span>
+  <b>我允許自己：</b>
+  {support.permission}
+</div>
         </div>
 
         <div style={{ marginTop: 20, padding: "0 5px" }}>
